@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Junquillar · Control de gastos</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div class="auth-shell" id="authView">
+    <div class="auth-card">
+      <div class="auth-badge">J</div>
+      <h1>Junquillar</h1>
+      <p>Control de gastos</p>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="email">Correo</label>
+          <input id="email" type="email" placeholder="correo@empresa.cl" />
+        </div>
+
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" placeholder="Contraseña" />
+        </div>
+      </div>
+
+      <button id="loginBtn" type="button" class="btn btn-primary btn-block">Iniciar sesión</button>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="appView">
+    <header class="topbar">
+      <div></div>
+      <div class="topbar-center">Junquillar · Control de gastos</div>
+      <div class="topbar-right">
+        <span id="userChip" class="user-mini"></span>
+        <button id="logoutBtn" type="button" class="logout-mini">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <main class="main-wrap">
+      <section id="menuSection" class="section-panel active">
+        <div class="menu-grid">
+          <button id="goToRegisterBtn" type="button" class="menu-card">
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zm0 0v5h5M9 13h6M9 17h6M9 9h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <span class="menu-text">
+              <strong>Registrar gasto</strong>
+              <small>Ingresa un nuevo gasto</small>
+            </span>
+          </button>
+
+          <button id="goToListBtn" type="button" class="menu-card menu-card-alt">
+            <span class="menu-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+            </span>
+            <span class="menu-text">
+              <strong>Revisar gastos</strong>
+              <small>Busca, edita o elimina</small>
+            </span>
+          </button>
+        </div>
+      </section>
+
+      <section id="registerSection" class="section-panel">
+        <div class="page-head">
+          <button id="backToMenuFromRegisterBtn" type="button" class="btn btn-ghost">← Volver</button>
+          <h2 id="formTitle">Registrar gasto</h2>
+          <div id="modoForm" class="mode-text"></div>
+        </div>
+
+        <div class="surface-card">
+          <div class="field-grid two-col">
+            <div class="field">
+              <label for="fecha">Fecha</label>
+              <input id="fecha" type="date" />
+            </div>
+
+            <div class="field">
+              <label for="proveedor">Proveedor</label>
+              <input id="proveedor" type="text" placeholder="Proveedor" />
+            </div>
+
+            <div class="field">
+              <label for="rut">RUT proveedor</label>
+              <input id="rut" type="text" placeholder="12.345.678-5" />
+            </div>
+
+            <div class="field">
+              <label for="tipo_documento">Tipo documento</label>
+              <select id="tipo_documento">
+                <option value="">Seleccionar</option>
+                <option value="Factura">Factura</option>
+                <option value="Factura exenta">Factura exenta</option>
+                <option value="Boleta">Boleta</option>
+                <option value="Boleta honorarios">Boleta honorarios</option>
+                <option value="Guía despacho">Guía despacho</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="numero_documento">Número documento</label>
+              <input id="numero_documento" type="text" placeholder="Número documento" />
+            </div>
+
+            <div class="field">
+              <label for="categoria">Categoría</label>
+              <select id="categoria">
+                <option value="">Seleccionar</option>
+                <option value="Materiales">Materiales</option>
+                <option value="Mano de obra">Mano de obra</option>
+                <option value="Herramientas">Herramientas</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Alimentación">Alimentación</option>
+                <option value="Arriendo">Arriendo</option>
+                <option value="Servicios">Servicios</option>
+                <option value="Permisos">Permisos</option>
+                <option value="Subcontrato">Subcontrato</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="metodo_pago">Método de pago</label>
+              <select id="metodo_pago">
+                <option value="">Seleccionar</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Débito">Débito</option>
+                <option value="Crédito">Crédito</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Cuenta empresa">Cuenta empresa</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="neto">Neto</label>
+              <input id="neto" type="number" step="0.01" placeholder="Neto" oninput="window.recalcularMontosJunquillar()" />
+            </div>
+
+            <div class="field trio-inline">
+              <div>
+                <label for="iva">IVA</label>
+                <input id="iva" type="number" step="0.01" placeholder="IVA" readonly />
+              </div>
+              <div>
+                <label for="total">Total</label>
+                <input id="total" type="number" step="0.01" placeholder="Total" readonly />
+              </div>
+            </div>
+
+            <div class="field span-2">
+              <label for="observacion">Observación</label>
+              <textarea id="observacion" placeholder="Observación"></textarea>
+            </div>
+
+            <div class="field span-2">
+              <label for="fileInput">Comprobante</label>
+              <input id="fileInput" type="file" accept="image/*" capture="environment" />
+              <div id="fotoActualInfo" class="help-text"></div>
+            </div>
+          </div>
+
+          <div class="action-stack">
+            <button id="uploadBtn" type="button" class="btn btn-primary">Guardar con foto</button>
+            <button id="testDbBtn" type="button" class="btn btn-soft">Guardar sin foto</button>
+            <button id="cancelEditBtn" type="button" class="btn btn-secondary hidden">Cancelar edición</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="listSection" class="section-panel">
+        <div class="page-head">
+          <button id="backToMenuFromListBtn" type="button" class="btn btn-ghost">← Volver</button>
+          <h2>Revisar gastos</h2>
+          <button id="loadBtn" type="button" class="btn btn-secondary">Actualizar</button>
+        </div>
+
+        <div class="surface-card filters-card">
+          <div class="field-grid three-col">
+            <div class="field">
+              <label for="filtroProveedor">Proveedor</label>
+              <input id="filtroProveedor" type="text" placeholder="Buscar por proveedor" />
+            </div>
+            <div class="field">
+              <label for="filtroFechaDesde">Fecha desde</label>
+              <input id="filtroFechaDesde" type="date" />
+            </div>
+            <div class="field">
+              <label for="filtroFechaHasta">Fecha hasta</label>
+              <input id="filtroFechaHasta" type="date" />
+            </div>
+          </div>
+          <div class="button-row top-gap">
+            <button id="applyFiltersBtn" type="button" class="btn btn-primary">Aplicar filtros</button>
+            <button id="clearFiltersBtn" type="button" class="btn btn-secondary">Limpiar filtros</button>
+          </div>
+        </div>
+
+        <div id="cardsWrap" class="expense-grid">
+          <div class="empty-card">Todavía no hay gastos cargados.</div>
+        </div>
+
+        <div class="footer-actions">
+          <button id="moreBtn" type="button" class="btn btn-secondary hidden">Más</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
