@@ -133,8 +133,46 @@ const bottomCards = [
   }
 ];
 
+const views = {
+  inicio: {
+    title: "Dashboard Junquillar",
+    subtitle: "Resumen general del proyecto",
+    visible: ["section-kpis", "section-charts", "section-docs", "section-bottom"]
+  },
+  costos: {
+    title: "Costos",
+    subtitle: "Control de gastos y avance presupuestario",
+    visible: ["section-kpis", "section-charts", "section-docs"]
+  },
+  compras: {
+    title: "Compras",
+    subtitle: "Seguimiento de adquisiciones y proveedores",
+    visible: ["section-kpis", "section-docs"]
+  },
+  documentos: {
+    title: "Documentos",
+    subtitle: "Facturas, boletas y respaldo del proyecto",
+    visible: ["section-docs"]
+  },
+  caja: {
+    title: "Caja",
+    subtitle: "Liquidez disponible y movimientos del proyecto",
+    visible: ["section-kpis", "section-bottom"]
+  },
+  balance: {
+    title: "Balance",
+    subtitle: "Vista general del estado financiero",
+    visible: ["section-kpis", "section-bottom"]
+  },
+  reportes: {
+    title: "Reportes",
+    subtitle: "Indicadores clave y análisis resumido",
+    visible: ["section-charts", "section-docs", "section-bottom"]
+  }
+};
+
 function renderKPIs() {
-  const el = document.getElementById("kpi-grid");
+  const el = document.getElementById("section-kpis");
   if (!el) return;
 
   el.innerHTML = kpis.map((kpi) => `
@@ -222,7 +260,7 @@ function renderCategories() {
 }
 
 function renderBottomCards() {
-  const el = document.getElementById("bottom-grid");
+  const el = document.getElementById("section-bottom");
   if (!el) return;
 
   el.innerHTML = bottomCards.map((card) => `
@@ -236,56 +274,6 @@ function renderBottomCards() {
     </div>
   `).join("");
 }
-
-function initDashboard() {
-  renderKPIs();
-  renderChart();
-  renderAlerts();
-  renderDocs();
-  renderCategories();
-  renderBottomCards();
-  setupNavigation();
-}
-
-
-
-const views = {
-  inicio: {
-    title: "Dashboard Junquillar",
-    subtitle: "Resumen general del proyecto",
-    visible: ["section-kpis", "section-charts", "section-docs", "section-bottom"]
-  },
-  costos: {
-    title: "Costos",
-    subtitle: "Control de gastos y avance presupuestario",
-    visible: ["section-kpis", "section-charts", "section-docs"]
-  },
-  compras: {
-    title: "Compras",
-    subtitle: "Seguimiento de adquisiciones y proveedores",
-    visible: ["section-kpis", "section-docs"]
-  },
-  documentos: {
-    title: "Documentos",
-    subtitle: "Facturas, boletas y respaldo del proyecto",
-    visible: ["section-docs"]
-  },
-  caja: {
-    title: "Caja",
-    subtitle: "Liquidez disponible y movimientos del proyecto",
-    visible: ["section-kpis", "section-bottom"]
-  },
-  balance: {
-    title: "Balance",
-    subtitle: "Vista general del estado financiero",
-    visible: ["section-kpis", "section-bottom"]
-  },
-  reportes: {
-    title: "Reportes",
-    subtitle: "Indicadores clave y análisis resumido",
-    visible: ["section-charts", "section-docs", "section-bottom"]
-  }
-};
 
 function updateVisibleSections(sectionIds = []) {
   const allSections = document.querySelectorAll(".module-block");
@@ -328,7 +316,14 @@ function setupNavigation() {
   updateVisibleSections(views.inicio.visible);
 }
 
-
-
+function initDashboard() {
+  renderKPIs();
+  renderChart();
+  renderAlerts();
+  renderDocs();
+  renderCategories();
+  renderBottomCards();
+  setupNavigation();
+}
 
 document.addEventListener("DOMContentLoaded", initDashboard);
