@@ -1,7 +1,8 @@
 // supabaseClient.js
 
-const SUPABASE_URL = " ";
-const SUPABASE_ANON_KEY = " ";
+// supabaseClient.example.js
+const SUPABASE_URL = "https://ccwaysefralvvcanfyck.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_CkQMEYmO3PMnHS8NbtDd9A_En8pvV6W";
 
 const supabaseClient = supabase.createClient(
   SUPABASE_URL,
