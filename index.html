@@ -79,17 +79,22 @@
       <!-- DOCUMENTOS / CARGA -->
       <section class="upload-filter-row module-block module-hidden" id="section-upload">
         <div class="card upload-card">
-          <div class="card-title">1. &nbsp;Adjuntar factura o boleta</div>
-          <div class="card-sub">Puedes adjuntar un archivo o sacar una foto</div>
+          <div class="card-title">1. &nbsp;Adjuntar factura, boleta o planilla</div>
+          <div class="card-sub">Puedes adjuntar un archivo, una planilla Excel/CSV o sacar una foto</div>
           <div class="dropzone">
             <div class="dropzone-icon">☁️</div>
             <div class="dropzone-text">Arrastra tu archivo aquí</div>
             <div class="dropzone-sub">
               o <span class="dropzone-link" onclick="document.getElementById('file-input').click()">selecciona un archivo</span>
             </div>
-            <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf" hidden/>
+            <input
+              type="file"
+              id="file-input"
+              accept=".jpg,.jpeg,.png,.pdf,.xls,.xlsx,.csv,application/pdf,image/jpeg,image/png,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+              hidden
+            />
           </div>
-          <div class="dropzone-formats">Formatos aceptados: JPG, PNG, PDF (máx. 10 MB)</div>
+          <div class="dropzone-formats">Formatos aceptados: JPG, PNG, PDF, Excel y CSV (máx. 10 MB)</div>
           <div class="upload-btns">
             <button class="upload-btn-primary" onclick="document.getElementById('file-input').click()">📎 &nbsp;Adjuntar archivo</button>
             <button class="upload-btn-secondary">📷 &nbsp;Sacar foto</button>
@@ -310,6 +315,7 @@
       <!-- CAJA E IVA -->
       <section class="module-block module-hidden" id="section-caja">
         <div class="kpi-grid" id="caja-kpis" style="margin-bottom:20px"></div>
+
         <div class="card">
           <div class="card-title">Clasificación por Tipo de Documento</div>
           <div class="card-sub">Calculado desde documentos registrados</div>

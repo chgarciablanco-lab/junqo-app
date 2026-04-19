@@ -2,15 +2,10 @@
    JUNQO – Casa Junquillar | app.js
    Fuente única de datos: Supabase
    Tabla: public.gastos_junquillar_app
-
-   Regla:
-   - No hay valores fijos de gastos, balance, caja, proveedores ni reportes.
-   - Todo se calcula desde los registros de Supabase.
-   - Si se eliminan los gastos en Supabase, el dashboard queda en cero / vacío.
    ============================================================ */
 
 const PROJECT_NAME = "Junquillar";
-const PROJECT_BUDGET = 180000000; // presupuesto referencial del proyecto. No es gasto ejecutado.
+const PROJECT_BUDGET = 180000000; // presupuesto referencial, no gasto ejecutado.
 
 let gastos = [];
 let filteredDocs = [];
@@ -55,12 +50,10 @@ const views = {
   },
   reportes: {
     title: "Reportes",
-    subtitle: "Análisis resumido por categoría y etapa",
+    subtitle: "Análisis resumido por categoría y mes",
     visible: ["section-reportes"]
   }
 };
-
-/* ── HELPERS ──────────────────────────────────────────────── */
 
 function $(id) {
   return document.getElementById(id);
@@ -79,11 +72,6 @@ function formatoCLP(value) {
     currency: "CLP",
     maximumFractionDigits: 0
   });
-}
-
-function formatoNumero(value) {
-  const n = numberValue(value);
-  return n.toLocaleString("es-CL", { maximumFractionDigits: 0 });
 }
 
 function formatoPct(value) {
@@ -117,11 +105,6 @@ function mesLabel(fecha) {
   const [y, m] = f.split("-");
   const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   return `${meses[Number(m) - 1] || m} ${y}`;
-}
-
-function safeText(value, fallback = "—") {
-  if (value === null || value === undefined || value === "") return fallback;
-  return String(value);
 }
 
 function getCategoriaClass(categoria = "") {
@@ -210,8 +193,6 @@ function emptyState(text = "Sin registros para mostrar.") {
   return `<div class="empty-state">${text}</div>`;
 }
 
-/* ── DATA LOAD ────────────────────────────────────────────── */
-
 async function loadData() {
   if (typeof supabaseClient === "undefined") {
     console.warn("Supabase no está configurado. Dashboard vacío.");
@@ -241,7 +222,7 @@ async function loadData() {
   renderAll();
 }
 
-/* ── RENDER: RESUMEN ─────────────────────────────────────── */
+/* ── RESUMEN ─────────────────────────────────────────────── */
 
 function renderKPIs() {
   const el = $("section-kpis");
@@ -374,7 +355,7 @@ function renderBottomCards() {
   `).join("");
 }
 
-/* ── RENDER: GASTOS / DOCUMENTOS ─────────────────────────── */
+/* ── GASTOS / DOCUMENTOS ─────────────────────────────────── */
 
 function renderDocs(limit = docsVisibleLimit) {
   const el = $("docs-table");
@@ -449,7 +430,14 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  ["filter-text", "filter-text-gastos", "filter-cat", "filter-cat-gastos", "filter-tipo", "filter-tipo-gastos", "filter-desde", "filter-desde-gastos", "filter-hasta", "filter-hasta-gastos", "filter-pago"].forEach(id => {
+  [
+    "filter-text", "filter-text-gastos",
+    "filter-cat", "filter-cat-gastos",
+    "filter-tipo", "filter-tipo-gastos",
+    "filter-desde", "filter-desde-gastos",
+    "filter-hasta", "filter-hasta-gastos",
+    "filter-pago"
+  ].forEach(id => {
     const el = $(id);
     if (el) el.value = "";
   });
@@ -459,7 +447,7 @@ function clearFilters() {
   renderDocs(docsVisibleLimit);
 }
 
-/* ── RENDER: PROVEEDORES ─────────────────────────────────── */
+/* ── PROVEEDORES ─────────────────────────────────────────── */
 
 function renderProveedores() {
   const el = $("proveedores-table");
@@ -501,11 +489,39 @@ function renderProveedores() {
   `).join("");
 }
 
-/* ── RENDER: CAJA / IVA ──────────────────────────────────── */
+/* ── CAJA / IVA ───────────────────────────────────────────── */
 
 function renderCaja() {
+  renderCajaKpis();
   renderCajaTipos();
   renderCajaMensual();
+}
+
+function renderCajaKpis() {
+  const el = $("caja-kpis");
+  if (!el) return;
+
+  const t = getTotals(gastos);
+  const docsConIva = gastos.filter(g => numberValue(g.iva) > 0).length;
+
+  const cards = [
+    { title: "Costo neto registrado", value: formatoCLP(t.neto), footer: `${t.docs} documentos registrados` },
+    { title: "IVA crédito fiscal", value: formatoCLP(t.iva), footer: "Calculado desde IVA registrado" },
+    { title: "Total documentos", value: formatoCLP(t.total), footer: "Neto + IVA" },
+    { title: "Docs con IVA", value: docsConIva, footer: "Documentos con crédito fiscal" }
+  ];
+
+  el.innerHTML = cards.map(card => `
+    <div class="kpi-card">
+      <div class="kpi-top">
+        <div>
+          <div class="kpi-title">${card.title}</div>
+          <div class="kpi-value">${card.value}</div>
+        </div>
+      </div>
+      <div class="kpi-footer">${card.footer}</div>
+    </div>
+  `).join("");
 }
 
 function renderCajaTipos() {
@@ -565,7 +581,7 @@ function renderCajaMensual() {
   `).join("");
 }
 
-/* ── RENDER: BALANCE ─────────────────────────────────────── */
+/* ── BALANCE ─────────────────────────────────────────────── */
 
 function renderBalance() {
   const el = $("balance-table");
@@ -633,7 +649,7 @@ function renderBalance() {
   `).join("");
 }
 
-/* ── RENDER: CONTROL DE PROYECTO ─────────────────────────── */
+/* ── CONTROL DE PROYECTO ─────────────────────────────────── */
 
 function renderControlProyecto() {
   renderControlKpis();
@@ -737,7 +753,11 @@ function renderControlCat() {
   el.innerHTML = Object.entries(catGroups).map(([cat, rows]) => {
     const byMonth = groupBy(rows, r => mesLabel(r.fecha));
     const catTotal = sumBy(rows, "neto");
-    const monthValues = months.slice(0, 5).map(m => `<div>${formatoCLP(sumBy(byMonth[m] || [], "neto"))}</div>`).join("");
+    const monthValues = Array.from({ length: 5 }).map((_, idx) => {
+      const m = months[idx];
+      return `<div>${m ? formatoCLP(sumBy(byMonth[m] || [], "neto")) : "—"}</div>`;
+    }).join("");
+
     return `
       <div class="table-row ctrl-cat-row">
         <div><span class="cat-badge ${getCategoriaClass(cat)}">${cat}</span></div>
@@ -750,7 +770,7 @@ function renderControlCat() {
   }).join("");
 }
 
-/* ── RENDER: REPORTES ────────────────────────────────────── */
+/* ── REPORTES ────────────────────────────────────────────── */
 
 function renderReportes() {
   renderReportesCat();
@@ -807,7 +827,7 @@ function renderReportesEtapas() {
     `).join("");
 }
 
-/* ── NAVIGATION ───────────────────────────────────────────── */
+/* ── NAVEGACIÓN ──────────────────────────────────────────── */
 
 function updateVisibleSections(sectionIds = []) {
   document.querySelectorAll(".module-block").forEach(section => {
@@ -864,15 +884,30 @@ function renderAll() {
   renderReportes();
 }
 
-/* ── EXPORTS ──────────────────────────────────────────────── */
+/* ── EXPORTACIÓN ─────────────────────────────────────────── */
 
 function rowsToCSV(rows) {
-  const headers = ["fecha", "proveedor", "rut", "tipo_documento", "numero_documento", "categoria", "neto", "iva", "total", "metodo_pago", "estado_ocr", "foto_path"];
+  const headers = [
+    "fecha",
+    "proveedor",
+    "rut",
+    "tipo_documento",
+    "numero_documento",
+    "categoria",
+    "neto",
+    "iva",
+    "total",
+    "metodo_pago",
+    "estado_ocr",
+    "foto_path"
+  ];
+
   const escape = value => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
   return [
     headers.join(";"),
     ...rows.map(row => headers.map(h => escape(row[h])).join(";"))
-  ].join("\n");
+  ].join("\\n");
 }
 
 function downloadText(filename, text) {
@@ -901,7 +936,7 @@ function exportProvExcel() {
   exportCSV();
 }
 
-/* ── INIT ─────────────────────────────────────────────────── */
+/* ── INIT ────────────────────────────────────────────────── */
 
 function initDashboard() {
   setupNavigation();
