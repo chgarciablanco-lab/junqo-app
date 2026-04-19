@@ -1218,3 +1218,5 @@ svg { display: inline-block; vertical-align: middle; }
   text-transform:uppercase;
   letter-spacing:.05em;
 }
+/* Complementos Junqo */
+.empty-state{padding:18px;color:var(--muted);background:#f8fafc;border-radius:12px;border:1px dashed var(--line);font-size:13px}.drag-over{border-color:var(--brand)!important;background:#f0f9ff!important}

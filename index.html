@@ -8,12 +8,8 @@
 </head>
 <body>
 <div class="layout">
-
   <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="wordmark">Junqo.</div>
-    </div>
-
+    <div class="sidebar-logo"><div class="wordmark">Junqo.</div></div>
     <nav class="sidebar-nav">
       <button class="nav-btn active" data-view="resumen">Resumen</button>
       <button class="nav-btn" data-view="control">Control de Proyecto</button>
@@ -24,17 +20,13 @@
       <button class="nav-btn" data-view="balance">Balance</button>
       <button class="nav-btn" data-view="reportes">Reportes</button>
     </nav>
-
     <div class="sidebar-card">
       <div class="label">Avance presupuesto</div>
       <div class="big">0%</div>
       <div class="sub">$ 0 de presupuesto ejecutado</div>
-      <div class="progress-track">
-        <div class="progress-fill" style="width:0%"></div>
-      </div>
+      <div class="progress-track"><div class="progress-fill" style="width:0%"></div></div>
       <button id="btn-ver-reportes">Ver reportes</button>
     </div>
-
     <div class="sidebar-user">
       <div class="avatar">CB</div>
       <div>
@@ -51,19 +43,13 @@
         <p id="page-subtitle">Vista ejecutiva del proyecto</p>
       </div>
       <div class="header-right">
-        <div class="search-wrap">
-          <input type="text" placeholder="Buscar proveedor, documento o partida"/>
-        </div>
+        <div class="search-wrap"><input type="text" id="global-search" placeholder="Buscar proveedor, documento o partida"/></div>
         <button class="btn-outline">Abr 2026</button>
-        <button class="bell-btn" aria-label="Notificaciones">
-          <span class="bell-dot"></span>🔔
-        </button>
+        <button class="bell-btn" aria-label="Notificaciones"><span class="bell-dot"></span>🔔</button>
       </div>
     </header>
 
     <div class="content">
-
-      <!-- RESUMEN -->
       <section class="kpi-grid module-block" id="section-kpis"></section>
 
       <section class="module-block" id="section-alerts">
@@ -76,319 +62,78 @@
 
       <section class="bottom-grid module-block" id="section-bottom"></section>
 
-      <!-- DOCUMENTOS / CARGA -->
       <section class="upload-filter-row module-block module-hidden" id="section-upload">
         <div class="card upload-card">
           <div class="card-title">1. &nbsp;Adjuntar factura, boleta o planilla</div>
-          <div class="card-sub">Puedes adjuntar un archivo, una planilla Excel/CSV o sacar una foto</div>
-          <div class="dropzone">
+          <div class="card-sub">Puedes adjuntar una foto, PDF, Excel o CSV</div>
+          <div class="dropzone" id="dropzone">
             <div class="dropzone-icon">☁️</div>
             <div class="dropzone-text">Arrastra tu archivo aquí</div>
-            <div class="dropzone-sub">
-              o <span class="dropzone-link" onclick="document.getElementById('file-input').click()">selecciona un archivo</span>
-            </div>
-            <input
-              type="file"
-              id="file-input"
-              accept=".jpg,.jpeg,.png,.pdf,.xls,.xlsx,.csv,application/pdf,image/jpeg,image/png,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-              hidden
-            />
+            <div class="dropzone-sub">o <span class="dropzone-link" id="select-file-link">selecciona un archivo</span></div>
+            <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf,.xls,.xlsx,.csv,application/pdf,image/jpeg,image/png,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden/>
           </div>
           <div class="dropzone-formats">Formatos aceptados: JPG, PNG, PDF, Excel y CSV (máx. 10 MB)</div>
           <div class="upload-btns">
-            <button class="upload-btn-primary" onclick="document.getElementById('file-input').click()">📎 &nbsp;Adjuntar archivo</button>
-            <button class="upload-btn-secondary">📷 &nbsp;Sacar foto</button>
+            <button class="upload-btn-primary" id="btn-adjuntar">📎 &nbsp;Adjuntar archivo</button>
+            <button class="upload-btn-secondary" id="btn-foto">📷 &nbsp;Sacar foto</button>
           </div>
         </div>
 
         <div class="card filter-card">
           <div class="card-title">2. &nbsp;Buscar y filtrar</div>
           <div class="card-sub">Encuentra tus gastos fácilmente</div>
-          <div class="filter-search-wrap">
-            <span class="filter-search-icon">🔍</span>
-            <input type="text" id="filter-text" class="filter-search-input" placeholder="Buscar por proveedor, categoría, tipo..."/>
+          <div class="filter-search-wrap"><span class="filter-search-icon">🔍</span><input type="text" id="filter-text" class="filter-search-input" placeholder="Buscar por proveedor, categoría, tipo..."/></div>
+          <div class="filter-row">
+            <div class="filter-group"><label class="filter-label">Categoría</label><select class="filter-select" id="filter-cat"><option value="">Todas</option><option>Materiales</option><option>Mano de obra</option><option>Servicios</option><option>Herramientas</option><option>Transporte</option></select></div>
+            <div class="filter-group"><label class="filter-label">Desde</label><input type="date" class="filter-select" id="filter-desde"/></div>
+            <div class="filter-group"><label class="filter-label">Hasta</label><input type="date" class="filter-select" id="filter-hasta"/></div>
           </div>
           <div class="filter-row">
-            <div class="filter-group">
-              <label class="filter-label">Categoría</label>
-              <select class="filter-select" id="filter-cat">
-                <option value="">Todas</option>
-                <option>Materiales</option>
-                <option>Mano de obra</option>
-                <option>Servicios</option>
-                <option>Herramientas</option>
-                <option>Transporte</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Desde</label>
-              <input type="date" class="filter-select" id="filter-desde"/>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Hasta</label>
-              <input type="date" class="filter-select" id="filter-hasta"/>
-            </div>
+            <div class="filter-group"><label class="filter-label">Tipo doc.</label><select class="filter-select" id="filter-tipo"><option value="">Todos</option><option value="Factura">Factura</option><option value="Guía despacho">Guía despacho</option><option value="Boleta">Boleta</option><option value="FA">FA</option><option value="GD">GD</option><option value="BE">BE</option></select></div>
+            <div class="filter-group"><label class="filter-label">Método de pago</label><select class="filter-select" id="filter-pago"><option value="">Todos</option><option>Contado</option><option>Transferencia</option><option>Débito</option><option>Crédito</option><option>Efectivo</option></select></div>
           </div>
-          <div class="filter-row">
-            <div class="filter-group">
-              <label class="filter-label">Tipo doc.</label>
-              <select class="filter-select" id="filter-tipo">
-                <option value="">Todos</option>
-                <option value="Factura">Factura</option>
-                <option value="Guía despacho">Guía despacho</option>
-                <option value="Boleta">Boleta</option>
-                <option value="FA">FA</option>
-                <option value="GD">GD</option>
-                <option value="BE">BE</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Método de pago</label>
-              <select class="filter-select" id="filter-pago">
-                <option value="">Todos</option>
-                <option>Contado</option>
-                <option>Transferencia</option>
-                <option>Débito</option>
-                <option>Crédito</option>
-                <option>Efectivo</option>
-              </select>
-            </div>
-          </div>
-          <div class="filter-actions">
-            <button class="filter-btn-apply" onclick="applyFilters()">🔽 &nbsp;Aplicar filtros</button>
-            <button class="filter-btn-clear" onclick="clearFilters()">↺ &nbsp;Limpiar filtros</button>
-          </div>
+          <div class="filter-actions"><button class="filter-btn-apply" id="btn-aplicar-filtros">🔽 &nbsp;Aplicar filtros</button><button class="filter-btn-clear" id="btn-limpiar-filtros">↺ &nbsp;Limpiar filtros</button></div>
         </div>
       </section>
 
-      <!-- BUSCADOR PARA GASTOS -->
       <section class="module-block module-hidden" id="section-filtro-solo">
         <div class="card filter-card">
           <div class="card-title">Buscar y filtrar gastos</div>
           <div class="card-sub">Filtra por categoría, fecha, tipo de documento o método de pago</div>
-          <div class="filter-search-wrap">
-            <span class="filter-search-icon">🔍</span>
-            <input type="text" id="filter-text-gastos" class="filter-search-input" placeholder="Buscar por proveedor, RUT, categoría..."/>
-          </div>
-          <div class="filter-row">
-            <div class="filter-group">
-              <label class="filter-label">Categoría</label>
-              <select class="filter-select" id="filter-cat-gastos">
-                <option value="">Todas</option>
-                <option>Materiales</option>
-                <option>Mano de obra</option>
-                <option>Servicios</option>
-                <option>Herramientas</option>
-                <option>Transporte</option>
-              </select>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Desde</label>
-              <input type="date" class="filter-select" id="filter-desde-gastos"/>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Hasta</label>
-              <input type="date" class="filter-select" id="filter-hasta-gastos"/>
-            </div>
-            <div class="filter-group">
-              <label class="filter-label">Tipo doc.</label>
-              <select class="filter-select" id="filter-tipo-gastos">
-                <option value="">Todos</option>
-                <option value="Factura">Factura</option>
-                <option value="Guía despacho">Guía despacho</option>
-                <option value="Boleta">Boleta</option>
-                <option value="FA">FA</option>
-                <option value="GD">GD</option>
-                <option value="BE">BE</option>
-              </select>
-            </div>
-          </div>
-          <div class="filter-actions">
-            <button class="filter-btn-apply" onclick="applyFilters()">🔽 Aplicar</button>
-            <button class="filter-btn-clear" onclick="clearFilters()">↺ Limpiar</button>
-          </div>
+          <div class="filter-search-wrap"><span class="filter-search-icon">🔍</span><input type="text" id="filter-text-gastos" class="filter-search-input" placeholder="Buscar por proveedor, RUT, categoría..."/></div>
         </div>
       </section>
 
-      <!-- LIBRO DE GASTOS -->
       <section class="module-block module-hidden" id="section-docs">
         <div class="card">
-          <div class="card-header-row">
-            <div>
-              <div class="card-title">Libro de Gastos — Casa Junquillar</div>
-              <div class="card-sub" id="docs-subtitle">Datos cargados desde Supabase</div>
-            </div>
-            <div class="export-btns">
-              <button class="export-btn" onclick="exportCSV()">⬇ CSV</button>
-              <button class="export-btn export-btn-xl" onclick="exportExcel()">⬇ Excel</button>
-            </div>
-          </div>
-
-          <div class="table-wrap">
-            <div class="table-head gastos-head">
-              <div>Fecha</div>
-              <div>Proveedor</div>
-              <div>RUT</div>
-              <div>Tipo</div>
-              <div>Categoría</div>
-              <div>Costo Neto</div>
-              <div>IVA CF</div>
-              <div>Total Doc.</div>
-              <div>CF?</div>
-              <div>Método Pago</div>
-              <div>Acc.</div>
-            </div>
-            <div id="docs-table"></div>
-          </div>
-
-          <div class="table-footer">
-            <button class="load-more-btn" id="load-more-btn">Ver más</button>
-          </div>
+          <div class="card-header-row"><div><div class="card-title">Libro de Gastos — Casa Junquillar</div><div class="card-sub" id="docs-subtitle">Datos cargados desde Supabase</div></div><div class="export-btns"><button class="export-btn" id="btn-export-csv">⬇ CSV</button><button class="export-btn export-btn-xl" id="btn-export-excel">⬇ Excel</button></div></div>
+          <div class="table-wrap"><div class="table-head gastos-head"><div>Fecha</div><div>Proveedor</div><div>RUT</div><div>Tipo</div><div>Categoría</div><div>Costo Neto</div><div>IVA CF</div><div>Total Doc.</div><div>CF?</div><div>Método Pago</div><div>Acc.</div></div><div id="docs-table"></div></div>
+          <div class="table-footer"><button class="load-more-btn" id="load-more-btn">Ver más</button></div>
         </div>
       </section>
 
-      <!-- CONTROL DE PROYECTO -->
       <section class="module-block module-hidden" id="section-control">
         <div class="kpi-grid" id="control-kpis"></div>
-
-        <div class="card">
-          <div class="card-title">Avance por Etapa de Obra</div>
-          <div class="card-sub">Calculado desde categorías registradas en Supabase</div>
-          <div id="control-etapas" class="etapas-grid"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Hitos y Estado del Proyecto</div>
-          <div class="card-sub">Estado calculado desde datos disponibles</div>
-          <div id="control-hitos"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Costos por Categoría y Mes</div>
-          <div class="card-sub">Calculado desde Supabase</div>
-          <div class="table-wrap">
-            <div class="table-head ctrl-cat-head">
-              <div>Categoría</div>
-              <div>Tipo</div>
-              <div>Mes 1</div>
-              <div>Mes 2</div>
-              <div>Mes 3</div>
-              <div>Mes 4</div>
-              <div>Mes 5</div>
-              <div>Total</div>
-              <div>%</div>
-            </div>
-            <div id="control-cat"></div>
-          </div>
-        </div>
+        <div class="card"><div class="card-title">Avance por Etapa de Obra</div><div class="card-sub">Calculado desde categorías registradas en Supabase</div><div id="control-etapas" class="etapas-grid"></div></div>
+        <div class="card"><div class="card-title">Hitos y Estado del Proyecto</div><div class="card-sub">Estado calculado desde datos disponibles</div><div id="control-hitos"></div></div>
+        <div class="card"><div class="card-title">Costos por Categoría y Mes</div><div class="card-sub">Calculado desde Supabase</div><div class="table-wrap"><div class="table-head ctrl-cat-head"><div>Categoría</div><div>Tipo</div><div>Mes 1</div><div>Mes 2</div><div>Mes 3</div><div>Mes 4</div><div>Mes 5</div><div>Total</div><div>%</div></div><div id="control-cat"></div></div></div>
       </section>
 
-      <!-- PROVEEDORES -->
-      <section class="module-block module-hidden" id="section-proveedores">
-        <div class="card">
-          <div class="card-header-row">
-            <div>
-              <div class="card-title">Análisis de Proveedores</div>
-              <div class="card-sub">Calculado desde gastos registrados</div>
-            </div>
-            <div class="export-btns">
-              <button class="export-btn" onclick="exportProvCSV()">⬇ CSV</button>
-              <button class="export-btn export-btn-xl" onclick="exportProvExcel()">⬇ Excel</button>
-            </div>
-          </div>
-          <div class="table-wrap">
-            <div class="table-head prov-head">
-              <div>#</div>
-              <div>Proveedor</div>
-              <div>RUT</div>
-              <div>Categoría</div>
-              <div>N° Docs</div>
-              <div>Costo Neto</div>
-              <div>IVA CF</div>
-              <div>% s/ Total</div>
-            </div>
-            <div id="proveedores-table"></div>
-          </div>
-        </div>
-      </section>
+      <section class="module-block module-hidden" id="section-proveedores"><div class="card"><div class="card-title">Análisis de Proveedores</div><div class="card-sub">Calculado desde gastos registrados</div><div class="table-wrap"><div class="table-head prov-head"><div>#</div><div>Proveedor</div><div>RUT</div><div>Categoría</div><div>N° Docs</div><div>Costo Neto</div><div>IVA CF</div><div>% s/ Total</div></div><div id="proveedores-table"></div></div></div></section>
 
-      <!-- CAJA E IVA -->
       <section class="module-block module-hidden" id="section-caja">
         <div class="kpi-grid" id="caja-kpis" style="margin-bottom:20px"></div>
-        <div class="card">
-          <div class="card-title">Clasificación por Tipo de Documento</div>
-          <div class="card-sub">Calculado desde documentos registrados</div>
-          <div class="table-wrap">
-            <div class="table-head caja-tipos-head">
-              <div>Tipo documento</div>
-              <div>N° docs</div>
-              <div>Base costo</div>
-              <div>IVA</div>
-              <div>CF?</div>
-              <div>Criterio contable</div>
-            </div>
-            <div id="caja-tipos"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Detalle Mensual — IVA Crédito Fiscal</div>
-          <div class="card-sub">Calculado desde registros de Supabase</div>
-          <div class="table-wrap">
-            <div class="table-head caja-mensual-head">
-              <div>Mes</div>
-              <div>Docs CF</div>
-              <div>Base Neta</div>
-              <div>IVA CF</div>
-              <div>Acumulado CF</div>
-            </div>
-            <div id="caja-mensual"></div>
-          </div>
-        </div>
+        <div class="card"><div class="card-title">Clasificación por Tipo de Documento</div><div class="card-sub">Calculado desde documentos registrados</div><div class="table-wrap"><div class="table-head caja-tipos-head"><div>Tipo documento</div><div>N° docs</div><div>Base costo</div><div>IVA</div><div>CF?</div><div>Criterio contable</div></div><div id="caja-tipos"></div></div></div>
+        <div class="card"><div class="card-title">Detalle Mensual — IVA Crédito Fiscal</div><div class="card-sub">Calculado desde registros de Supabase</div><div class="table-wrap"><div class="table-head caja-mensual-head"><div>Mes</div><div>Docs CF</div><div>Base Neta</div><div>IVA CF</div><div>Acumulado CF</div></div><div id="caja-mensual"></div></div></div>
       </section>
 
-      <!-- BALANCE -->
-      <section class="module-block module-hidden" id="section-balance">
-        <div class="card">
-          <div class="card-title">Balance General — Proyecto Casa Junquillar</div>
-          <div class="card-sub">Balance calculado desde gastos registrados en Supabase</div>
-          <div class="table-wrap">
-            <div class="table-head balance-head">
-              <div>N°</div>
-              <div>Cuenta</div>
-              <div>DEBE</div>
-              <div>HABER</div>
-              <div>DEUDOR</div>
-              <div>ACREEDOR</div>
-              <div>ACTIVO</div>
-              <div>PASIVO</div>
-              <div>PÉRDIDA</div>
-              <div>GANANCIA</div>
-            </div>
-            <div id="balance-table"></div>
-          </div>
-        </div>
-      </section>
+      <section class="module-block module-hidden" id="section-balance"><div class="card"><div class="card-title">Balance General — Proyecto Casa Junquillar</div><div class="card-sub">Balance calculado desde gastos registrados en Supabase</div><div class="table-wrap"><div class="table-head balance-head"><div>N°</div><div>Cuenta</div><div>DEBE</div><div>HABER</div><div>DEUDOR</div><div>ACREEDOR</div><div>ACTIVO</div><div>PASIVO</div><div>PÉRDIDA</div><div>GANANCIA</div></div><div id="balance-table"></div></div></div></section>
 
-      <!-- REPORTES -->
-      <section class="module-block module-hidden" id="section-reportes">
-        <div class="card">
-          <div class="card-title">Reporte por Categoría</div>
-          <div class="card-sub">Calculado desde gastos registrados</div>
-          <div id="reportes-cat"></div>
-        </div>
-
-        <div class="card">
-          <div class="card-title">Reporte Mensual</div>
-          <div class="card-sub">Calculado desde gastos registrados</div>
-          <div id="reportes-etapas"></div>
-        </div>
-      </section>
+      <section class="module-block module-hidden" id="section-reportes"><div class="card"><div class="card-title">Reporte por Categoría</div><div class="card-sub">Calculado desde gastos registrados</div><div id="reportes-cat"></div></div><div class="card"><div class="card-title">Reporte Mensual</div><div class="card-sub">Calculado desde gastos registrados</div><div id="reportes-etapas"></div></div></section>
 
     </div>
   </main>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabaseClient.js"></script>
 <script src="app.js"></script>
