@@ -140,6 +140,158 @@ function getFileGroup(extension){
   if(["xls","xlsx","csv"].includes(extension)) return "planillas";
   return "pdf";
 }
+// ── Column name aliases: maps Excel headers → DB field names ──────────────────
+const COLUMN_ALIASES = {
+  fecha:["fecha","date","f."],
+  proveedor:["proveedor","supplier","nombre","razon social","razón social"],
+  rut:["rut","r.u.t","r.u.t.","rut proveedor"],
+  tipo_documento:["tipo","tipo documento","tipo doc","tipo doc.","type","documento"],
+  numero_documento:["n° documento","nro documento","numero documento","número documento","folio","n°","nro","doc"],
+  neto:["neto","monto neto","base","base neta","costo neto","net"],
+  iva:["iva","i.v.a","i.v.a.","tax","impuesto"],
+  total:["total","total doc","total documento","monto total","total bruto"],
+  categoria:["categoria","categoría","category","partida","etapa"],
+  metodo_pago:["metodo pago","método pago","metodo de pago","método de pago","forma pago","forma de pago","pago","payment"],
+  observacion:["observacion","observación","nota","notas","comment","comentario"]
+};
+
+function normalizeHeader(h){
+  return String(h||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+}
+
+function mapHeaders(headerRow){
+  const map = {};
+  headerRow.forEach((raw, idx) => {
+    const norm = normalizeHeader(raw);
+    for(const [field, aliases] of Object.entries(COLUMN_ALIASES)){
+      if(aliases.some(a => norm === a || norm.includes(a))){
+        if(map[field] === undefined) map[field] = idx;
+        break;
+      }
+    }
+  });
+  return map;
+}
+
+function parseExcelDate(val){
+  if(!val) return null;
+  // Excel serial date number
+  if(typeof val === "number"){
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().slice(0,10);
+  }
+  const s = String(val).trim();
+  // dd-mm-yyyy or dd/mm/yyyy
+  if(/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(s)){
+    const [d,m,y] = s.split(/[\/\-]/);
+    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+  }
+  // yyyy-mm-dd
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return s || null;
+}
+
+function parseNumericField(val){
+  if(val === null || val === undefined || val === "") return null;
+  const n = Number(String(val).replace(/\./g,"").replace(",",".").replace(/[^0-9.\-]/g,""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseSheetRows(worksheet){
+  const range = window.XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+  const rows = [];
+  for(let R = range.s.r; R <= range.e.r; R++){
+    const row = [];
+    for(let C = range.s.c; C <= range.e.c; C++){
+      const cell = worksheet[window.XLSX.utils.encode_cell({r:R, c:C})];
+      row.push(cell ? cell.v : "");
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function excelRowsToGastos(rows, fotoPath){
+  if(!rows || rows.length < 2) return [];
+  // Find header row: first row with >= 3 non-empty cells
+  let headerIdx = 0;
+  for(let i = 0; i < Math.min(5, rows.length); i++){
+    if(rows[i].filter(c => String(c||"").trim()).length >= 3){ headerIdx = i; break; }
+  }
+  const headerRow = rows[headerIdx];
+  const colMap = mapHeaders(headerRow);
+  const results = [];
+  for(let i = headerIdx + 1; i < rows.length; i++){
+    const row = rows[i];
+    if(!row || row.every(c => !String(c||"").trim())) continue; // skip empty rows
+    const get = field => colMap[field] !== undefined ? row[colMap[field]] : undefined;
+    const neto  = parseNumericField(get("neto"));
+    const iva   = parseNumericField(get("iva"));
+    const total = parseNumericField(get("total"));
+    // Skip rows that look like totals or headers repeated
+    const proveedor = String(get("proveedor")||"").trim();
+    if(["total","subtotal","totales"].includes(proveedor.toLowerCase())) continue;
+    results.push({
+      fecha:           parseExcelDate(get("fecha")) || new Date().toISOString().slice(0,10),
+      proveedor:       proveedor || null,
+      rut:             String(get("rut")||"").trim() || null,
+      tipo_documento:  String(get("tipo_documento")||"").trim() || null,
+      numero_documento:String(get("numero_documento")||"").trim() || null,
+      neto:            neto,
+      iva:             iva,
+      total:           total,
+      categoria:       String(get("categoria")||"").trim() || null,
+      metodo_pago:     String(get("metodo_pago")||"").trim() || null,
+      observacion:     String(get("observacion")||"").trim() || null,
+      proyecto:        PROJECT_NAME,
+      foto_path:       fotoPath,
+      estado_ocr:      "importado"
+    });
+  }
+  return results;
+}
+
+async function parseSpreadsheet(file, fotoPath){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = window.XLSX.read(data, { type:"array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = parseSheetRows(worksheet);
+        resolve(excelRowsToGastos(rows, fotoPath));
+      } catch(err){
+        console.error("Error parseando planilla:", err);
+        resolve([]);
+      }
+    };
+    reader.onerror = () => resolve([]);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function parseCSV(file, fotoPath){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const sep = text.includes(";") ? ";" : ",";
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const rows = lines.map(l => l.split(sep).map(c => c.replace(/^"|"$/g,"").trim()));
+        resolve(excelRowsToGastos(rows, fotoPath));
+      } catch(err){
+        console.error("Error parseando CSV:", err);
+        resolve([]);
+      }
+    };
+    reader.onerror = () => resolve([]);
+    reader.readAsText(file, "UTF-8");
+  });
+}
+
 async function handleFileUpload(event){
   const file = event.target.files?.[0];
   if(!file) return;
@@ -164,6 +316,7 @@ async function handleFileUpload(event){
   const fileGroup = getFileGroup(extension);
   const filePath = `junquillar/${fileGroup}/${Date.now()}-${safeName}`;
 
+  // 1. Subir archivo a Storage
   const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
     .from(BUCKET_NAME)
     .upload(filePath, file, { cacheControl:"3600", upsert:false, contentType:file.type || undefined });
@@ -175,18 +328,72 @@ async function handleFileUpload(event){
     return;
   }
 
+  const storedPath = uploadData.path;
+
+  // 2. Si es planilla, parsear y insertar filas con datos reales
+  const isSpreadsheet = ["xls","xlsx"].includes(extension);
+  const isCSV = extension === "csv";
+
+  if(isSpreadsheet || isCSV){
+    if(typeof window.XLSX === "undefined"){
+      alert("La librería para leer Excel no está cargada. Verifica tu conexión a internet.");
+      event.target.value = "";
+      return;
+    }
+    const gastoRows = isCSV
+      ? await parseCSV(file, storedPath)
+      : await parseSpreadsheet(file, storedPath);
+
+    if(!gastoRows.length){
+      alert("El archivo se subió, pero no se encontraron filas con datos reconocibles.\nRevisa que los encabezados del Excel coincidan con los campos esperados (fecha, proveedor, neto, iva, total, etc.).");
+      event.target.value = "";
+      await loadData();
+      return;
+    }
+
+    // Insertar en lotes de 50
+    const BATCH = 50;
+    let totalInserted = 0;
+    for(let i = 0; i < gastoRows.length; i += BATCH){
+      const batch = gastoRows.slice(i, i + BATCH);
+      const { error: insertError } = await window.supabaseClient
+        .from("gastos_junquillar_app")
+        .insert(batch);
+      if(insertError){
+        console.error("Error insertando lote:", insertError);
+        alert(`Se insertaron ${totalInserted} filas, luego ocurrió un error: ${insertError.message}`);
+        event.target.value = "";
+        await loadData();
+        return;
+      }
+      totalInserted += batch.length;
+    }
+
+    alert(`✅ Planilla importada correctamente.\n${totalInserted} registros cargados desde "${file.name}".`);
+    event.target.value = "";
+    await loadData();
+    return;
+  }
+
+  // 3. Para imágenes y PDFs: crear un registro pendiente OCR
   const { error: insertError } = await window.supabaseClient
     .from("gastos_junquillar_app")
-    .insert({ fecha: new Date().toISOString().slice(0,10), proyecto: PROJECT_NAME, observacion: `Archivo adjunto: ${file.name}`, estado_ocr:"pendiente", foto_path: uploadData.path });
+    .insert({
+      fecha: new Date().toISOString().slice(0,10),
+      proyecto: PROJECT_NAME,
+      observacion: `Archivo adjunto: ${file.name}`,
+      estado_ocr: "pendiente",
+      foto_path: storedPath
+    });
 
   if(insertError){
     console.error("Error creando registro:", insertError);
-    alert(`El archivo se subió, pero no se pudo crear el registro en la tabla: ${insertError.message || "Error desconocido"}`);
+    alert(`El archivo se subió, pero no se pudo crear el registro: ${insertError.message || "Error desconocido"}`);
     event.target.value = "";
     return;
   }
 
-  alert("Archivo adjuntado correctamente.");
+  alert("📎 Archivo adjuntado correctamente.");
   event.target.value = "";
   await loadData();
 }
