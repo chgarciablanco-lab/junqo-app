@@ -193,39 +193,48 @@ function renderBottomCards(){
 }
 
 /* ── GASTOS TABLE ─────────────────────────────────────────── */
-function renderDocs(limit=docsVisibleLimit){
+function gastoRowHTML(g, fotoUrl){
+  const safeNombre=(g.proveedor||"").replace(/'/g,"\\'").replace(/"/g,"&quot;");
+  return`<div class="table-row gastos-row">
+    <div>${normalizarFecha(g.fecha)}</div>
+    <div><div class="doc-name">${g.proveedor||"Pendiente OCR"}</div><div class="doc-amount">${g.observacion||""}</div></div>
+    <div style="font-size:11px;color:#94a3b8">${g.rut||"—"}</div>
+    <div style="font-size:12px;color:#64748b">${g.tipo_documento||"—"}</div>
+    <div><span class="cat-badge ${getCategoriaClass(g.categoria)}">${g.categoria||"Sin categoría"}</span></div>
+    <div>${formatoCLP(g.neto)}</div>
+    <div>${g.iva?formatoCLP(g.iva):"—"}</div>
+    <div>${g.total?formatoCLP(g.total):"—"}</div>
+    <div style="text-align:center">${numberValue(g.iva)>0?"✔":"—"}</div>
+    <div style="font-size:12px;color:#64748b">${g.metodo_pago||"—"}</div>
+    <div class="doc-actions">
+      <button class="action-btn foto-btn" data-path="${g.foto_path||""}" title="${g.foto_path?"Ver comprobante":"Sin comprobante"}" style="${g.foto_path?"":"opacity:.3;cursor:default"}">📎</button>
+      <button class="action-btn" title="Editar" onclick="openEditModal('${g.id}')">✏️</button>
+      <button class="action-btn" title="Eliminar" onclick="confirmDelete('${g.id}','${safeNombre}','${g.foto_path||""}')">🗑️</button>
+    </div>
+  </div>`;
+}
+
+async function renderDocs(limit=docsVisibleLimit){
   const el=$("docs-table"),sub=$("docs-subtitle"),btn=$("load-more-btn");if(!el)return;
   if(sub)sub.textContent=`${filteredDocs.length} registros · datos cargados desde Supabase`;
   if(!filteredDocs.length){el.innerHTML=emptyState("No hay gastos registrados.");if(btn)btn.style.display="none";return;}
-  el.innerHTML=filteredDocs.slice(0,limit).map(g=>{
-    const d=normalizarFecha(g.fecha);
-    const fotoUrl=g.foto_path?getFotoUrl(g.foto_path):null;
-    return`<div class="table-row gastos-row">
-      <div>${d}</div>
-      <div><div class="doc-name">${g.proveedor||"Pendiente OCR"}</div><div class="doc-amount">${g.observacion||""}</div></div>
-      <div style="font-size:11px;color:#94a3b8">${g.rut||"—"}</div>
-      <div style="font-size:12px;color:#64748b">${g.tipo_documento||"—"}</div>
-      <div><span class="cat-badge ${getCategoriaClass(g.categoria)}">${g.categoria||"Sin categoría"}</span></div>
-      <div>${formatoCLP(g.neto)}</div>
-      <div>${g.iva?formatoCLP(g.iva):"—"}</div>
-      <div>${g.total?formatoCLP(g.total):"—"}</div>
-      <div style="text-align:center">${numberValue(g.iva)>0?"✔":"—"}</div>
-      <div style="font-size:12px;color:#64748b">${g.metodo_pago||"—"}</div>
-      <div class="doc-actions">
-        ${fotoUrl?`<button class="action-btn" title="Ver comprobante" onclick="window.open('${fotoUrl}','_blank')">📎</button>`:`<span style="color:#cbd5e1;font-size:12px">—</span>`}
-        <button class="action-btn" title="Editar" onclick="openEditModal('${g.id}')">✏️</button>
-        <button class="action-btn" title="Eliminar" onclick="confirmDelete('${g.id}','${(g.proveedor||"").replace(/'/g,"\\'")}')">🗑️</button>
-      </div>
-    </div>`;
-  }).join("");
+  const slice=filteredDocs.slice(0,limit);
+  el.innerHTML=slice.map(g=>gastoRowHTML(g,null)).join("");
   if(btn)btn.style.display=filteredDocs.length>limit?"inline-flex":"none";
+  // Cargar URLs firmadas de forma asíncrona para cada fila con foto
+  el.querySelectorAll(".foto-btn").forEach(async btn2=>{
+    const path=btn2.dataset.path;if(!path)return;
+    const url=await getFotoUrl(path);
+    if(url){ btn2.style.opacity="1"; btn2.style.cursor="pointer"; btn2.onclick=()=>window.open(url,"_blank"); }
+  });
 }
 
-function getFotoUrl(path){
+async function getFotoUrl(path){
   if(!path||typeof window.supabaseClient==="undefined") return null;
   try{
-    const{data}=window.supabaseClient.storage.from(BUCKET_NAME).getPublicUrl(path);
-    return data?.publicUrl||null;
+    const{data,error}=await window.supabaseClient.storage.from(BUCKET_NAME).createSignedUrl(path,300);
+    if(error||!data?.signedUrl) return null;
+    return data.signedUrl;
   }catch(e){return null;}
 }
 
@@ -259,7 +268,7 @@ function clearFilters(){
 function openEditModal(id){
   const g=gastos.find(x=>String(x.id)===String(id));if(!g)return;
   editModalGasto=g;
-  const m=$("edit-modal");if(!m)return;
+  const m=$("modal-overlay");if(!m)return;
   $("em-fecha").value=g.fecha||"";
   $("em-proveedor").value=g.proveedor||"";
   $("em-rut").value=g.rut||"";
@@ -273,7 +282,7 @@ function openEditModal(id){
   $("em-obs").value=g.observacion||"";
   m.classList.remove("modal-hidden");
 }
-function closeEditModal(){ $("edit-modal")?.classList.add("modal-hidden"); editModalGasto=null; }
+function closeEditModal(){ $("modal-overlay")?.classList.add("modal-hidden"); editModalGasto=null; }
 async function saveEditModal(){
   if(!editModalGasto)return;
   const updates={
@@ -294,9 +303,15 @@ async function saveEditModal(){
   if(error){alert(`Error guardando: ${error.message}`);return;}
   closeEditModal();await loadData();
 }
-async function confirmDelete(id,nombre){
+async function confirmDelete(id,nombre,fotoPath){
   if(!confirm(`¿Eliminar el gasto de "${nombre}"?\nEsta acción no se puede deshacer.`))return;
   if(typeof window.supabaseClient==="undefined"){alert("Sin conexión.");return;}
+  // Borrar archivo del storage si existe
+  if(fotoPath){
+    const{error:storageErr}=await window.supabaseClient.storage.from(BUCKET_NAME).remove([fotoPath]);
+    if(storageErr) console.warn("No se pudo borrar el archivo del storage:",storageErr.message);
+  }
+  // Borrar registro de la tabla
   const{error}=await window.supabaseClient.from("gastos_junquillar_app").delete().eq("id",id);
   if(error){alert(`Error eliminando: ${error.message}`);return;}
   await loadData();
