@@ -14,7 +14,7 @@ const views = {
   resumen: { title: "Resumen", subtitle: "Vista ejecutiva del proyecto", visible: ["section-kpis", "section-alerts", "section-bottom"] },
   control: { title: "Control de Proyecto", subtitle: "Avance presupuestario, partidas e hitos", visible: ["section-control"] },
   gastos: { title: "Gastos", subtitle: "Registro y control de egresos del proyecto", visible: ["section-filtro-solo", "section-docs"] },
-  documentos: { title: "Documentos", subtitle: "Carga de facturas, boletas y respaldo documental", visible: ["section-upload", "section-docs"] },
+  documentos: { title: "Documentos", subtitle: "Carga de facturas, boletas y respaldo documental", visible: ["section-upload"] },
   proveedores: { title: "Proveedores", subtitle: "Análisis por proveedor, documentos y concentración de gasto", visible: ["section-proveedores"] },
   caja: { title: "Caja e IVA", subtitle: "Crédito fiscal, documentos y detalle mensual", visible: ["section-caja"] },
   balance: { title: "Balance", subtitle: "Vista contable calculada desde los gastos registrados", visible: ["section-balance"] },

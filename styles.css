@@ -1011,8 +1011,8 @@ svg { display: inline-block; vertical-align: middle; }
 .etapa-partidas{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px}
 .etapa-progress-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .etapa-progress-bar{flex:1;height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden}
-.etapa-progress-fill{height:8px;background:#2563eb;border-radius:999px}
-.etapa-pct{font-size:13px;font-weight:700;color:#2563eb;flex-shrink:0;width:36px;text-align:right}
+.etapa-progress-fill{height:8px;background:#059669;border-radius:999px}
+.etapa-pct{font-size:13px;font-weight:700;color:#059669;flex-shrink:0;width:36px;text-align:right}
 .etapa-nums{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .etapa-num{display:flex;flex-direction:column;gap:2px}
 .etapa-lbl{font-size:11px;color:var(--muted-soft)}
@@ -1244,7 +1244,6 @@ svg { display: inline-block; vertical-align: middle; }
   line-height: 1.5;
 }
 
-
 /* ── REPORTES ETAPAS TABLE ───────────────────────────────── */
 .etapa-reporte-row{display:grid;grid-template-columns:1.5fr 1.1fr 1.1fr 1.1fr 1fr !important;gap:10px;border-bottom:1px solid #f1f5f9;padding:14px 16px;font-size:13px;background:#fff;align-items:center}
 .etapa-reporte-row:last-child{border-bottom:none}
@@ -1392,3 +1391,194 @@ svg { display: inline-block; vertical-align: middle; }
 }
 /* Complementos Junqo */
 .empty-state{padding:18px;color:var(--muted);background:#f8fafc;border-radius:12px;border:1px dashed var(--line);font-size:13px}.drag-over{border-color:var(--brand)!important;background:#f0f9ff!important}
+
+
+/* ── FIX DEFINITIVO BALANCE CUADRADO ─────────────────────── */
+
+#section-balance .table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 14px;
+}
+
+/* Misma grilla exacta para TODAS las filas del balance */
+.balance-group-head,
+.balance-head,
+.balance-row,
+.balance-subtotal,
+.balance-total {
+  display: grid !important;
+  grid-template-columns:
+    48px      /* N° */
+    220px     /* Cuenta */
+    130px     /* Debe */
+    130px     /* Haber */
+    130px     /* Deudor */
+    130px     /* Acreedor */
+    130px     /* Activo */
+    130px     /* Pasivo */
+    130px     /* Pérdida */
+    130px;    /* Ganancia */
+  min-width: 1328px;
+  width: 1328px;
+  gap: 0 !important;
+  align-items: stretch;
+}
+
+/* Header de grupos MOVIMIENTOS / SALDOS / BALANCE / RESULTADOS */
+.balance-group-head {
+  background: #0f172a;
+  color: #94a3b8;
+  padding: 0 !important;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+}
+
+.balance-group-head > div {
+  padding: 8px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,.14);
+}
+
+/* Cols 1-2: N° y Cuenta (vacío) */
+.balance-group-head > div:nth-child(1) { grid-column: 1 / 3; text-align:left; padding-left:14px; color: #475569; }
+/* Cols 3-4: MOVIMIENTOS */
+.balance-group-head > div:nth-child(2) { grid-column: 3 / 5; color:#93c5fd; }
+/* Cols 5-6: SALDOS */
+.balance-group-head > div:nth-child(3) { grid-column: 5 / 7; color:#86efac; }
+/* Cols 7-8: BALANCE */
+.balance-group-head > div:nth-child(4) { grid-column: 7 / 9; color:#fde68a; }
+/* Cols 9-10: RESULTADOS */
+.balance-group-head > div:nth-child(5) { grid-column: 9 / 11; color:#d8b4fe; }
+
+/* Cabecera de columnas */
+.balance-head {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--line);
+  padding: 0 !important;
+}
+
+.balance-head > div {
+  padding: 10px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  text-align: center;
+  border-right: 1px solid var(--line);
+}
+
+.balance-head > div:nth-child(2) { text-align: left; }
+
+/* Filas de datos */
+.balance-row,
+.balance-subtotal,
+.balance-total {
+  padding: 0 !important;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+}
+
+.balance-row > div,
+.balance-subtotal > div,
+.balance-total > div {
+  padding: 14px 12px !important;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid #e2e8f0;
+  min-height: 54px;
+}
+
+.balance-row > div:nth-child(1),
+.balance-subtotal > div:nth-child(1),
+.balance-total > div:nth-child(1) {
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.balance-row > div:nth-child(2),
+.balance-subtotal > div:nth-child(2),
+.balance-total > div:nth-child(2) {
+  justify-content: flex-start;
+  font-weight: 500;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.balance-row > div:nth-child(n+3),
+.balance-subtotal > div:nth-child(n+3),
+.balance-total > div:nth-child(n+3) {
+  justify-content: flex-end;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Colores por grupo */
+.balance-row > div:nth-child(3),
+.balance-row > div:nth-child(4) { background: #fafbff; }
+.balance-row > div:nth-child(5),
+.balance-row > div:nth-child(6) { background: #f0fdf4; }
+.balance-row > div:nth-child(7),
+.balance-row > div:nth-child(8) { background: #fffbeb; }
+.balance-row > div:nth-child(9),
+.balance-row > div:nth-child(10) { background: #fdf4ff; }
+
+/* Separadores de sección */
+.balance-section-header {
+  display: block !important;
+  min-width: 1328px;
+  width: 1328px;
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+  padding: 7px 16px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #334155;
+}
+
+/* Subtotal */
+.balance-subtotal { background: #f8fafc !important; font-weight: 700; }
+.balance-subtotal > div { background: #f8fafc !important; }
+
+/* Fila TOTAL */
+.balance-total { background: #0f172a !important; color: #fff !important; font-weight: 700; }
+.balance-total > div { background: #0f172a !important; color: #fff !important; border-right: 1px solid rgba(255,255,255,.15); }
+.balance-total > div:nth-child(3),
+.balance-total > div:nth-child(4) { background: #1e3a5f !important; }
+.balance-total > div:nth-child(5),
+.balance-total > div:nth-child(6) { background: #14532d !important; }
+.balance-total > div:nth-child(7),
+.balance-total > div:nth-child(8) { background: #78350f !important; }
+.balance-total > div:nth-child(9),
+.balance-total > div:nth-child(10) { background: #4c1d95 !important; }
+
+/* Balance activo verde */
+.balance-activo { color: #059669; font-weight: 600; }
+
+/* Scrollbar */
+#section-balance .table-wrap::-webkit-scrollbar { height: 8px; }
+#section-balance .table-wrap::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 999px; }
+#section-balance .table-wrap::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+
+/* Note */
+.balance-note {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius-sm);
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.5;
+}
