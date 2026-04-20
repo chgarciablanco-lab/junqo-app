@@ -570,3 +570,7 @@ function setupButtons(){
 }
 function initDashboard(){setupNavigation();setupFileUpload();setupButtons();updateVisibleSections(views.resumen.visible);loadData();}
 document.addEventListener("DOMContentLoaded",initDashboard);
+
+window.openEditModal  = openEditModal;
+window.closeEditModal = closeEditModal;
+window.confirmDelete  = confirmDelete;
