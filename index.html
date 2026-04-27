@@ -12,13 +12,15 @@
     <div class="sidebar-logo"><div class="wordmark">Junqo.</div></div>
     <nav class="sidebar-nav">
       <button class="nav-btn active" data-view="resumen">Resumen</button>
-      <button class="nav-btn" data-view="control">Control de Proyecto</button>
       <button class="nav-btn" data-view="gastos">Gastos</button>
       <button class="nav-btn" data-view="documentos">Documentos</button>
       <button class="nav-btn" data-view="proveedores">Proveedores</button>
       <button class="nav-btn" data-view="caja">Caja e IVA</button>
       <button class="nav-btn" data-view="balance">Balance</button>
       <button class="nav-btn" data-view="reportes">Reportes</button>
+      <button class="nav-btn" data-view="ventas">Ventas</button>
+      <button class="nav-btn" data-view="insumos">Insumos</button>
+      <button class="nav-btn" data-view="configuracion">Configuración</button>
     </nav>
     <div class="sidebar-card">
       <div class="label">Avance presupuesto</div>
@@ -57,9 +59,9 @@
       <section class="kpi-grid module-block" id="section-kpis"></section>
       <section class="module-block" id="section-alerts">
         <div class="card">
-          <div class="card-title">Alertas críticas</div>
-          <div class="card-sub">Calculadas desde los datos registrados en Supabase</div>
-          <div id="alerts-list" class="alerts-2x2"></div>
+          <div class="card-title">Estado del Proyecto</div>
+          <div class="card-sub">Avance financiero, alertas e hitos calculados desde Supabase</div>
+          <div id="alerts-list"></div>
         </div>
       </section>
       <section class="bottom-grid module-block" id="section-bottom"></section>
@@ -164,22 +166,16 @@
         </div>
       </section>
 
-      <!-- ── CONTROL DE PROYECTO ── -->
+      <!-- ── CONTROL DE PROYECTO (integrado en Resumen) ── -->
       <section class="module-block module-hidden" id="section-control">
-        <div class="kpi-grid" id="control-kpis"></div>
         <div class="card">
-          <div class="card-title">Avance por Etapa de Obra</div>
-          <div class="card-sub">Calculado desde categorías registradas en Supabase</div>
+          <div class="card-title">Avance por Partida de Obra</div>
+          <div class="card-sub">Categorías ordenadas por monto ejecutado · calculado desde Supabase</div>
           <div id="control-etapas"></div>
         </div>
         <div class="card">
-          <div class="card-title">Hitos y Estado del Proyecto</div>
-          <div class="card-sub">Estado calculado desde datos disponibles</div>
-          <div id="control-hitos"></div>
-        </div>
-        <div class="card">
           <div class="card-title">Costos por Categoría y Mes</div>
-          <div class="card-sub">Calculado desde Supabase</div>
+          <div class="card-sub">Desglose mensual por partida · calculado desde Supabase</div>
           <div class="table-wrap">
             <div class="table-head ctrl-cat-head">
               <div>Categoría</div><div>Tipo</div><div>Mes 1</div><div>Mes 2</div>
@@ -248,10 +244,30 @@
 
       <!-- ── REPORTES ── -->
       <section class="module-block module-hidden" id="section-reportes">
+        <div class="card">
+          <div class="card-title">📥 Exportar reportes</div>
+          <div class="card-sub">Elige el formato y haz clic en el reporte que quieres descargar</div>
+          <div id="reportes-export" style="margin-top:16px"></div>
+        </div>
         <div class="card" style="margin-bottom:0">
           <div id="reportes-config"></div>
         </div>
         <div id="reportes-widgets"></div>
+      </section>
+
+      <!-- ── VENTAS ── -->
+      <section class="module-block module-hidden" id="section-ventas">
+        <div id="ventas-root"></div>
+      </section>
+
+      <!-- ── INSUMOS ── -->
+      <section class="module-block module-hidden" id="section-insumos">
+        <div id="insumos-root"></div>
+      </section>
+
+      <!-- ── CONFIGURACIÓN ── -->
+      <section class="module-block module-hidden" id="section-config">
+        <div id="config-root"></div>
       </section>
 
     </div><!-- /content -->
