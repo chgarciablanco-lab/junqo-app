@@ -1,123 +1,84 @@
-/* JUNQO – Casa Junquillar | app.js corregido completo
-   Reemplaza el app.js actual. No requiere archivos adicionales.
-*/
-
-const BUDGET_KEY = "junqo_presupuesto";
-let PROJECT_BUDGET = 180000000;
+/* JUNQO – Casa Junquillar | app.js limpio */
 const PROJECT_NAME = "Junquillar";
+const PROJECT_BUDGET = 180000000;
 const BUCKET_NAME = "comprobantes-junquillar";
 const MAX_FILE_SIZE_MB = 10;
 const ALLOWED_FILE_EXTENSIONS = ["jpg", "jpeg", "png", "pdf", "xls", "xlsx", "csv"];
-const REPORT_WIDGETS_KEY = "junqo_report_widgets";
-const CATEGORIAS = ["Materiales", "Mano de obra", "Servicios", "Herramientas", "Transporte"];
 
 let gastos = [];
 let filteredDocs = [];
 let currentView = "resumen";
 let docsVisibleLimit = 10;
-let editModalGasto = null;
-let selectedIds = new Set();
 
 const views = {
-  resumen: { title: "Resumen", subtitle: "Vista ejecutiva y control del proyecto", visible: ["section-kpis", "section-alerts", "section-control"] },
+  resumen: { title: "Resumen", subtitle: "Vista ejecutiva del proyecto", visible: ["section-kpis", "section-alerts", "section-bottom"] },
+  control: { title: "Control de Proyecto", subtitle: "Avance presupuestario, partidas e hitos", visible: ["section-control"] },
   gastos: { title: "Gastos", subtitle: "Registro y control de egresos del proyecto", visible: ["section-filtro-solo", "section-docs"] },
-  documentos: { title: "Documentos", subtitle: "Carga de facturas, boletas y respaldo documental", visible: ["section-upload-only"] },
-  proveedores: { title: "Proveedores", subtitle: "Análisis por proveedor, documentos y concentración", visible: ["section-proveedores"] },
+  documentos: { title: "Documentos", subtitle: "Carga de facturas, boletas y respaldo documental", visible: ["section-upload", "section-docs"] },
+  proveedores: { title: "Proveedores", subtitle: "Análisis por proveedor, documentos y concentración de gasto", visible: ["section-proveedores"] },
   caja: { title: "Caja e IVA", subtitle: "Crédito fiscal, documentos y detalle mensual", visible: ["section-caja"] },
   balance: { title: "Balance", subtitle: "Vista contable calculada desde los gastos registrados", visible: ["section-balance"] },
-  reportes: { title: "Reportes", subtitle: "Reporte ejecutivo del proyecto", visible: ["section-reportes"] },
-  ventas: { title: "Ventas", subtitle: "Ingresos, cotizaciones y contactos del proyecto", visible: ["section-ventas"] },
-  insumos: { title: "Insumos", subtitle: "Control de materiales y stock en obra", visible: ["section-insumos"] },
-  configuracion: { title: "Configuración", subtitle: "Ajustes generales del proyecto", visible: ["section-config"] }
+  reportes: { title: "Reportes", subtitle: "Análisis resumido por categoría y mes", visible: ["section-reportes"] }
 };
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
-function numberValue(value) {
-  if (value === null || value === undefined || value === "") return 0;
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  const n = Number(String(value).replace(/\./g, "").replace(",", ".").replace(/[^0-9.-]/g, ""));
+function numberValue(value){
+  if(value === null || value === undefined || value === "") return 0;
+  const n = Number(String(value).replace(/\./g, "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 }
-function formatoCLP(value) {
-  return numberValue(value).toLocaleString("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+function formatoCLP(value){
+  return numberValue(value).toLocaleString("es-CL", { style:"currency", currency:"CLP", maximumFractionDigits:0 });
 }
-function formatoPct(value) {
-  return `${Number(value || 0).toLocaleString("es-CL", { maximumFractionDigits: 1 })}%`;
+function formatoPct(value){
+  return `${Number(value || 0).toLocaleString("es-CL", { maximumFractionDigits:1 })}%`;
 }
-function normalizarFecha(fecha) {
-  if (!fecha) return "—";
-  const raw = String(fecha).slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [y, m, d] = raw.split("-");
+function normalizarFecha(fecha){
+  if(!fecha) return "—";
+  const raw = String(fecha).slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
+    const [y,m,d] = raw.split("-");
     return `${d}/${m}/${y}`;
   }
   return raw;
 }
-function fechaOrdenable(fecha) {
-  if (!fecha) return "";
-  const raw = String(fecha).slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw;
-  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) {
-    const [d, m, y] = raw.split("/");
+function fechaOrdenable(fecha){
+  if(!fecha) return "";
+  if(/^\d{4}-\d{2}-\d{2}/.test(fecha)) return String(fecha).slice(0,10);
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(fecha)){
+    const [d,m,y] = fecha.split("/");
     return `${y}-${m}-${d}`;
   }
-  return raw;
+  return String(fecha);
 }
-function mesLabel(fecha) {
+function mesLabel(fecha){
   const f = fechaOrdenable(fecha);
-  if (!f || f.length < 7) return "Sin fecha";
-  const [y, m] = f.split("-");
-  const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  return `${meses[Number(m) - 1] || m} ${y}`;
+  if(!f || f.length < 7) return "Sin fecha";
+  const [y,m] = f.split("-");
+  const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  return `${meses[Number(m)-1] || m} ${y}`;
 }
-function getCategoriaClass(categoria = "") {
+function getCategoriaClass(categoria=""){
   const cat = String(categoria || "").toLowerCase();
-  if (cat.includes("material")) return "cat-materiales";
-  if (cat.includes("mano")) return "cat-mano";
-  if (cat.includes("servicio") || cat.includes("aliment")) return "cat-servicios";
-  if (cat.includes("herramienta")) return "cat-herramientas";
-  if (cat.includes("transporte")) return "cat-transporte";
+  if(cat.includes("material")) return "cat-materiales";
+  if(cat.includes("mano")) return "cat-mano";
+  if(cat.includes("servicio") || cat.includes("aliment")) return "cat-servicios";
+  if(cat.includes("herramienta")) return "cat-herramientas";
+  if(cat.includes("transporte")) return "cat-transporte";
   return "cat-otros";
 }
-function sumBy(rows, field) {
-  return rows.reduce((acc, item) => acc + numberValue(item[field]), 0);
-}
-function uniqueCount(rows, field) {
-  return new Set(rows.map(i => i[field]).filter(Boolean)).size;
-}
-function groupBy(rows, keyFn) {
+function sumBy(rows, field){ return rows.reduce((acc, item) => acc + numberValue(item[field]), 0); }
+function uniqueCount(rows, field){ return new Set(rows.map(i => i[field]).filter(Boolean)).size; }
+function groupBy(rows, keyFn){
   return rows.reduce((acc, row) => {
     const key = keyFn(row) || "Sin clasificar";
-    if (!acc[key]) acc[key] = [];
+    if(!acc[key]) acc[key] = [];
     acc[key].push(row);
     return acc;
   }, {});
 }
-function emptyState(text = "Sin registros.") {
-  return `<div class="empty-state">${text}</div>`;
-}
-function setText(id, value) {
-  const el = $(id);
-  if (el) el.textContent = value;
-}
-function csvEscape(value) {
-  const v = String(value ?? "").replace(/\r?\n/g, " ").trim();
-  return `"${v.replace(/"/g, '""')}"`;
-}
-function downloadBlob(filename, content, mime) {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function getTotals(rows = gastos) {
+function getTotals(rows = gastos){
   const neto = sumBy(rows, "neto");
   const iva = sumBy(rows, "iva");
   const total = sumBy(rows, "total");
@@ -125,12 +86,13 @@ function getTotals(rows = gastos) {
   const proveedores = uniqueCount(rows, "proveedor");
   const pendientesOcr = rows.filter(g => String(g.estado_ocr || "").toLowerCase() === "pendiente").length;
   const sinProveedor = rows.filter(g => !g.proveedor).length;
-  const docsConCF = rows.filter(g => numberValue(g.iva) > 0).length;
-  const docsSinCF = rows.filter(g => numberValue(g.iva) <= 0).length;
-  return { neto, iva, total, docs, proveedores, pendientesOcr, sinProveedor, docsConCF, docsSinCF };
+  return { neto, iva, total, docs, proveedores, pendientesOcr, sinProveedor };
+}
+function emptyState(text="Sin registros para mostrar."){
+  return `<div class="empty-state">${text}</div>`;
 }
 
-function mapSupabaseRow(row) {
+function mapSupabaseRow(row){
   return {
     id: row.id,
     fecha: row.fecha,
@@ -151,148 +113,355 @@ function mapSupabaseRow(row) {
     foto_path: row.foto_path || ""
   };
 }
-
-/* ── CARGA DATOS ─────────────────────────────────────────── */
-async function loadBudget() {
-  if (typeof window.supabaseClient === "undefined") return;
-  try {
-    const { data } = await window.supabaseClient
-      .from("junqo_config")
-      .select("value")
-      .eq("key", BUDGET_KEY)
-      .single();
-    if (data?.value) PROJECT_BUDGET = Number(data.value) || PROJECT_BUDGET;
-  } catch (_) {}
-}
-async function saveBudget(val) {
-  PROJECT_BUDGET = val;
-  if (typeof window.supabaseClient !== "undefined") {
-    await window.supabaseClient
-      .from("junqo_config")
-      .upsert({ key: BUDGET_KEY, value: String(val), proyecto: PROJECT_NAME }, { onConflict: "key" });
-  }
-  renderAll();
-}
-async function loadData() {
-  if (typeof window.supabaseClient === "undefined") {
-    console.warn("Supabase no está configurado. Dashboard vacío.");
-    gastos = [];
-    filteredDocs = [];
-    renderAll();
-    return;
-  }
-
-  const { data, error } = await window.supabaseClient
-    .from("gastos_junquillar_app")
-    .select("*")
-    .eq("proyecto", PROJECT_NAME)
-    .order("fecha", { ascending: false })
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error("Error cargando gastos:", error);
-    gastos = [];
-    filteredDocs = [];
-    renderAll();
-    return;
-  }
-
-  gastos = (data || []).map(mapSupabaseRow);
-  filteredDocs = [...gastos];
-  await loadBudget();
-  renderAll();
+function docRowFromGasto(gasto){
+  return {
+    date: normalizarFecha(gasto.fecha),
+    name: gasto.proveedor || "Pendiente OCR",
+    rut: gasto.rut || "—",
+    tipo: gasto.tipo_documento || "—",
+    cat: gasto.categoria || "Sin categoría",
+    catCls: getCategoriaClass(gasto.categoria),
+    costo: formatoCLP(gasto.neto),
+    iva: gasto.iva ? formatoCLP(gasto.iva) : "—",
+    total: gasto.total ? formatoCLP(gasto.total) : "—",
+    cf: numberValue(gasto.iva) > 0 ? "✔" : "—",
+    pago: gasto.metodo_pago || "—",
+    fotoPath: gasto.foto_path || null,
+    observacion: gasto.observacion || ""
+  };
 }
 
-/* ── UPLOAD SIMPLE ───────────────────────────────────────── */
-function getFileExtension(filename) {
-  return String(filename || "").split(".").pop().toLowerCase();
+function getFileExtension(filename){ return String(filename || "").split(".").pop().toLowerCase(); }
+function sanitizeFileName(filename){
+  return String(filename || "archivo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9._-]/g, "_");
 }
-function sanitizeFileName(filename) {
-  return String(filename || "archivo")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-function getFileGroup(extension) {
-  if (["jpg", "jpeg", "png"].includes(extension)) return "imagenes";
-  if (["xls", "xlsx", "csv"].includes(extension)) return "planillas";
+function getFileGroup(extension){
+  if(["jpg","jpeg","png"].includes(extension)) return "imagenes";
+  if(["xls","xlsx","csv"].includes(extension)) return "planillas";
   return "pdf";
 }
-async function handleFileUpload(event) {
+// ── Column name aliases: maps Excel headers → DB field names ──────────────────
+// ── PARSER EXCEL / CSV ────────────────────────────────────────────────────────
+// Estructura esperada del Excel:
+//   Fila 1: título (se ignora)
+//   Fila 2: encabezados  →  Fecha | Proveedor | RUT | Tipo | Nº Documento | Neto | IVA | Total | Categoría | Método de Pago | Proyecto
+//   Fila 3+: datos
+//   Última fila: puede ser fila de TOTAL (se ignora)
+
+// Mapeo exacto de encabezados del Excel → campos Supabase
+const EXACT_HEADERS = {
+  0:  "fecha",
+  1:  "proveedor",
+  2:  "rut",
+  3:  "tipo_documento",
+  4:  "numero_documento",
+  5:  "neto",
+  6:  "iva",
+  7:  "total",
+  8:  "categoria",
+  9:  "metodo_pago",
+  10: "proyecto"
+};
+
+// Aliases flexibles para otros Excel con encabezados distintos
+const HEADER_ALIASES = {
+  fecha:            ["fecha","date"],
+  proveedor:        ["proveedor","supplier","nombre","razón social","razon social","nombre proveedor"],
+  rut:              ["rut","r.u.t","r.u.t.","rut proveedor"],
+  tipo_documento:   ["tipo","tipo documento","tipo doc","tipo doc.","type","documento","nº documento"],
+  numero_documento: ["nº documento","n° documento","numero documento","número documento","folio","nro","n°","doc"],
+  neto:             ["neto","monto neto","base neta","costo neto","net","base"],
+  iva:              ["iva","i.v.a","i.v.a.","tax","impuesto"],
+  total:            ["total","total doc","total documento","monto total","total bruto"],
+  categoria:        ["categoría","categoria","category","partida","etapa"],
+  metodo_pago:      ["método de pago","metodo de pago","método pago","metodo pago","forma pago","forma de pago","pago","payment"],
+  proyecto:         ["proyecto","project"]
+};
+
+function normH(h){ return String(h||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim(); }
+
+function buildColMap(headerRow){
+  // 1. Try exact positional match (our Excel format)
+  const knownHeaders = ["fecha","proveedor","rut","tipo","nº documento","neto","iva","total","categoría","método de pago","proyecto"];
+  const normalizedRow = headerRow.map(normH);
+  const exactMatch = knownHeaders.every((h,i) => normalizedRow[i] && normalizedRow[i].includes(normH(h)));
+  if(exactMatch){
+    // Use positional map directly
+    const map = {};
+    Object.entries(EXACT_HEADERS).forEach(([idx, field]) => { map[field] = Number(idx); });
+    return map;
+  }
+  // 2. Fallback: alias matching
+  const map = {};
+  normalizedRow.forEach((norm, idx) => {
+    for(const [field, aliases] of Object.entries(HEADER_ALIASES)){
+      if(map[field] !== undefined) continue;
+      if(aliases.some(a => norm === normH(a) || norm.includes(normH(a)))){
+        map[field] = idx;
+        break;
+      }
+    }
+  });
+  return map;
+}
+
+function toDateISO(val){
+  if(val === null || val === undefined || val === "") return null;
+  // Excel serial number
+  if(typeof val === "number"){
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    if(!isNaN(d)) return d.toISOString().slice(0,10);
+  }
+  const s = String(val).trim();
+  if(/^\d{2}[-\/]\d{2}[-\/]\d{4}$/.test(s)){
+    const [d,m,y] = s.split(/[-\/]/);
+    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+  }
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return null;
+}
+
+function toNum(val){
+  if(val === null || val === undefined || val === "") return null;
+  if(typeof val === "number") return val;
+  const n = Number(String(val).replace(/\./g,"").replace(",",".").replace(/[^0-9.\-]/g,""));
+  return Number.isFinite(n) ? n : null;
+}
+
+function isSkipRow(row, colMap){
+  const proveedor = String(row[colMap.proveedor ?? 1] || "").trim().toLowerCase();
+  const total     = String(row[colMap.total     ?? 7] || "").trim().toLowerCase();
+  const neto      = String(row[colMap.neto      ?? 5] || "").trim().toLowerCase();
+  // Skip title rows, header rows, total rows, empty rows
+  if(!row.some(c => String(c||"").trim())) return true;
+  if(["total","subtotal","totales","sub total"].includes(proveedor)) return true;
+  if(["total","subtotal","totales","sub total"].includes(neto))      return true;
+  if(proveedor === "proveedor" || proveedor === "supplier")          return true;
+  return false;
+}
+
+function sheetToGastos(allRows, fotoPath){
+  if(!allRows || allRows.length < 2) return [];
+
+  // Find header row: first row where col 0 looks like "fecha" or col 1 like "proveedor"
+  let headerRowIdx = -1;
+  for(let i = 0; i < Math.min(5, allRows.length); i++){
+    const r = allRows[i];
+    const c0 = normH(r[0]);
+    const c1 = normH(r[1]);
+    if(c0 === "fecha" || c0.includes("fecha") || c1 === "proveedor" || c1.includes("proveedor")){
+      headerRowIdx = i;
+      break;
+    }
+  }
+  if(headerRowIdx === -1){
+    // No header found, try row 0 anyway
+    headerRowIdx = 0;
+  }
+
+  const headerRow = allRows[headerRowIdx];
+  const colMap = buildColMap(headerRow);
+
+  // Need at minimum fecha or proveedor mapped
+  if(colMap.fecha === undefined && colMap.proveedor === undefined){
+    console.warn("No se encontraron columnas reconocibles en el Excel.");
+    return [];
+  }
+
+  const results = [];
+  for(let i = headerRowIdx + 1; i < allRows.length; i++){
+    const row = allRows[i];
+    if(isSkipRow(row, colMap)) continue;
+    const get = field => colMap[field] !== undefined ? row[colMap[field]] : undefined;
+
+    const fechaVal = toDateISO(get("fecha"));
+    const neto     = toNum(get("neto"));
+    const iva      = toNum(get("iva"));
+    const total    = toNum(get("total"));
+
+    // Skip rows with no usable data
+    if(!fechaVal && !get("proveedor") && !neto) continue;
+
+    results.push({
+      fecha:            fechaVal || new Date().toISOString().slice(0,10),
+      proveedor:        String(get("proveedor") || "").trim() || null,
+      rut:              String(get("rut")        || "").trim() || null,
+      tipo_documento:   String(get("tipo_documento")   || "").trim() || null,
+      numero_documento: String(get("numero_documento") || "").trim() || null,
+      neto:             neto,
+      iva:              iva,
+      total:            total,
+      categoria:        String(get("categoria")   || "").trim() || null,
+      metodo_pago:      String(get("metodo_pago") || "").trim() || null,
+      proyecto:         PROJECT_NAME,
+      foto_path:        fotoPath,
+      estado_ocr:       "importado"
+    });
+  }
+  return results;
+}
+
+async function parseSpreadsheet(file, fotoPath){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const wb = window.XLSX.read(data, { type:"array", cellDates:false });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        // Get raw values (not formatted strings) so numbers stay as numbers
+        const allRows = window.XLSX.utils.sheet_to_json(ws, { header:1, defval:"", raw:true });
+        resolve(sheetToGastos(allRows, fotoPath));
+      } catch(err){
+        console.error("Error parseando Excel:", err);
+        resolve([]);
+      }
+    };
+    reader.onerror = () => resolve([]);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function parseCSV(file, fotoPath){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const sep = text.includes(";") ? ";" : ",";
+        const allRows = text.split(/\r?\n/)
+          .filter(l => l.trim())
+          .map(l => l.split(sep).map(c => c.replace(/^"|"$/g,"").trim()));
+        resolve(sheetToGastos(allRows, fotoPath));
+      } catch(err){
+        console.error("Error parseando CSV:", err);
+        resolve([]);
+      }
+    };
+    reader.onerror = () => resolve([]);
+    reader.readAsText(file, "UTF-8");
+  });
+}
+
+async function handleFileUpload(event){
   const file = event.target.files?.[0];
-  if (!file) return;
+  if(!file) return;
 
   const extension = getFileExtension(file.name);
-  if (!ALLOWED_FILE_EXTENSIONS.includes(extension)) {
+  if(!ALLOWED_FILE_EXTENSIONS.includes(extension)){
     alert("Formato no permitido. Usa JPG, PNG, PDF, Excel o CSV.");
-    event.target.value = "";
-    return;
+    event.target.value = ""; return;
   }
-  if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+  if(file.size > MAX_FILE_SIZE_MB * 1024 * 1024){
     alert(`El archivo supera el máximo permitido de ${MAX_FILE_SIZE_MB} MB.`);
-    event.target.value = "";
-    return;
+    event.target.value = ""; return;
   }
-  if (typeof window.supabaseClient === "undefined") {
+  if(typeof window.supabaseClient === "undefined"){
     alert("Supabase no está configurado.");
-    event.target.value = "";
-    return;
+    event.target.value = ""; return;
+  }
+  if((["xls","xlsx","csv"].includes(extension)) && typeof window.XLSX === "undefined"){
+    alert("La librería para leer Excel no está cargada. Verifica tu conexión a internet.");
+    event.target.value = ""; return;
   }
 
-  const safeName = sanitizeFileName(file.name);
+  // ── Paso 1: parsear ANTES de subir (si es planilla) ──────────────────────
+  const isSpreadsheet = ["xls","xlsx"].includes(extension);
+  const isCSV = extension === "csv";
+
+  let gastoRows = [];
+  if(isSpreadsheet || isCSV){
+    gastoRows = isCSV
+      ? await parseCSV(file, null)   // fotoPath = null por ahora
+      : await parseSpreadsheet(file, null);
+
+    if(!gastoRows.length){
+      alert("No se encontraron filas con datos reconocibles en el archivo.\n\nAsegúrate de que el Excel tenga encabezados en la fila 2:\nFecha | Proveedor | RUT | Tipo | Nº Documento | Neto | IVA | Total | Categoría | Método de Pago");
+      event.target.value = ""; return;
+    }
+  }
+
+  // ── Paso 2: subir archivo a Storage ──────────────────────────────────────
+  const safeName  = sanitizeFileName(file.name);
   const fileGroup = getFileGroup(extension);
-  const filePath = `junquillar/${fileGroup}/${Date.now()}-${safeName}`;
+  const filePath  = `junquillar/${fileGroup}/${Date.now()}-${safeName}`;
 
   const { data: uploadData, error: uploadError } = await window.supabaseClient.storage
     .from(BUCKET_NAME)
-    .upload(filePath, file, { cacheControl: "3600", upsert: false, contentType: file.type || undefined });
+    .upload(filePath, file, { cacheControl:"3600", upsert:false, contentType: file.type || undefined });
 
-  if (uploadError) {
+  if(uploadError){
+    console.error("Error subiendo archivo:", uploadError);
     alert(`No se pudo subir el archivo: ${uploadError.message}`);
-    event.target.value = "";
-    return;
+    event.target.value = ""; return;
   }
 
+  const storedPath = uploadData.path;
+
+  // ── Paso 3a: si es planilla → insertar filas en Supabase ─────────────────
+  if(isSpreadsheet || isCSV){
+    // Actualizar foto_path con el path real
+    gastoRows.forEach(r => r.foto_path = storedPath);
+
+    const BATCH = 50;
+    let inserted = 0;
+    for(let i = 0; i < gastoRows.length; i += BATCH){
+      const batch = gastoRows.slice(i, i + BATCH);
+      const { error } = await window.supabaseClient
+        .from("gastos_junquillar_app")
+        .insert(batch);
+      if(error){
+        console.error("Error insertando lote:", error);
+        alert(`Se insertaron ${inserted} filas, luego error: ${error.message}`);
+        event.target.value = "";
+        await loadData(); return;
+      }
+      inserted += batch.length;
+    }
+    alert(`✅ ${inserted} registros importados desde "${file.name}".`);
+    event.target.value = "";
+    await loadData(); return;
+  }
+
+  // ── Paso 3b: imagen o PDF → registro pendiente OCR ───────────────────────
   const { error: insertError } = await window.supabaseClient
     .from("gastos_junquillar_app")
     .insert({
-      fecha: new Date().toISOString().slice(0, 10),
-      proyecto: PROJECT_NAME,
+      fecha:       new Date().toISOString().slice(0,10),
+      proyecto:    PROJECT_NAME,
       observacion: `Archivo adjunto: ${file.name}`,
-      estado_ocr: "pendiente",
-      foto_path: uploadData.path
+      estado_ocr:  "pendiente",
+      foto_path:   storedPath
     });
 
-  if (insertError) {
+  if(insertError){
+    console.error("Error creando registro:", insertError);
     alert(`Archivo subido pero no se pudo crear el registro: ${insertError.message}`);
-    event.target.value = "";
-    return;
+    event.target.value = ""; return;
   }
 
   alert("📎 Archivo adjuntado correctamente.");
   event.target.value = "";
   await loadData();
 }
-function setupFileUpload() {
+function setupFileUpload(){
   const input = $("file-input");
-  if (!input) return;
-  input.addEventListener("change", handleFileUpload);
-  $("select-file-link")?.addEventListener("click", () => input.click());
-  $("btn-adjuntar")?.addEventListener("click", () => input.click());
-  $("btn-foto")?.addEventListener("click", () => input.click());
-
+  const selectLink = $("select-file-link");
+  const btnAdjuntar = $("btn-adjuntar");
+  const btnFoto = $("btn-foto");
   const dropzone = $("dropzone");
-  if (dropzone) {
-    dropzone.addEventListener("dragover", e => {
-      e.preventDefault();
-      dropzone.classList.add("drag-over");
-    });
+  if(!input) return;
+  input.addEventListener("change", handleFileUpload);
+  if(selectLink) selectLink.addEventListener("click", () => input.click());
+  if(btnAdjuntar) btnAdjuntar.addEventListener("click", () => input.click());
+  if(btnFoto) btnFoto.addEventListener("click", () => input.click());
+  if(dropzone){
+    dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("drag-over"); });
     dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
     dropzone.addEventListener("drop", async e => {
-      e.preventDefault();
-      dropzone.classList.remove("drag-over");
+      e.preventDefault(); dropzone.classList.remove("drag-over");
       const file = e.dataTransfer?.files?.[0];
-      if (!file) return;
+      if(!file) return;
       const dt = new DataTransfer();
       dt.items.add(file);
       input.files = dt.files;
@@ -301,890 +470,157 @@ function setupFileUpload() {
   }
 }
 
-/* ── RESUMEN ─────────────────────────────────────────────── */
-function renderKPIs() {
-  const el = $("section-kpis");
-  if (!el) return;
-  const t = getTotals();
-  const avance = PROJECT_BUDGET ? (t.neto / PROJECT_BUDGET) * 100 : 0;
-  const saldo = Math.max(PROJECT_BUDGET - t.neto, 0);
-  const kpis = [
-    ["Avance financiero", formatoPct(avance), "Ejecutado", `${formatoCLP(t.neto)} ejecutado de ${formatoCLP(PROJECT_BUDGET)}`],
-    ["Inversión neta", formatoCLP(t.neto), `${t.docs} docs`, `${t.proveedores} proveedores registrados`],
-    ["Saldo disponible", formatoCLP(saldo), saldo > 0 ? "Disponible" : "Agotado", "Presupuesto referencial menos ejecutado"],
-    ["IVA crédito fiscal", formatoCLP(t.iva), "CF", `${t.docsConCF} documentos con crédito fiscal`]
-  ];
-  el.innerHTML = kpis.map(k => `
-    <div class="kpi-card">
-      <div class="kpi-top">
-        <div>
-          <div class="kpi-title">${k[0]}</div>
-          <div class="kpi-value">${k[1]}</div>
-        </div>
-        <span class="badge up">${k[2]}</span>
-      </div>
-      <div class="kpi-footer">${k[3]}</div>
-    </div>
-  `).join("");
+async function loadData(){
+  if(typeof window.supabaseClient === "undefined"){
+    console.warn("Supabase no está configurado. Dashboard vacío.");
+    gastos = []; filteredDocs = []; renderAll(); return;
+  }
+  const { data, error } = await window.supabaseClient
+    .from("gastos_junquillar_app")
+    .select("*")
+    .eq("proyecto", PROJECT_NAME)
+    .order("fecha", { ascending:false })
+    .order("created_at", { ascending:false });
+  if(error){ console.error("Error cargando gastos:", error); gastos=[]; filteredDocs=[]; renderAll(); return; }
+  gastos = (data || []).map(mapSupabaseRow);
+  filteredDocs = [...gastos];
+  renderAll();
+}
 
+function renderKPIs(){
+  const el = $("section-kpis"); if(!el) return;
+  const t = getTotals(); const avance = PROJECT_BUDGET ? (t.neto / PROJECT_BUDGET) * 100 : 0;
+  const kpis = [
+    ["Inversión total neta", formatoCLP(t.neto), formatoPct(avance), `${t.docs} documentos registrados`],
+    ["IVA crédito fiscal", formatoCLP(t.iva), t.iva > 0 ? "CF" : "0", "Calculado desde IVA registrado"],
+    ["Total documentos", formatoCLP(t.total), `${t.proveedores} prov.`, "Total bruto acumulado"],
+    ["Pendientes OCR", String(t.pendientesOcr), t.pendientesOcr > 0 ? "pend." : "ok", `${t.sinProveedor} registros sin proveedor`]
+  ];
+  el.innerHTML = kpis.map(k => `<div class="kpi-card"><div class="kpi-top"><div><div class="kpi-title">${k[0]}</div><div class="kpi-value">${k[1]}</div></div><span class="badge up">${k[2]}</span></div><div class="kpi-footer">${k[3]}</div></div>`).join("");
   const sidebarBig = document.querySelector(".sidebar-card .big");
   const sidebarSub = document.querySelector(".sidebar-card .sub");
   const sidebarFill = document.querySelector(".sidebar-card .progress-fill");
-  if (sidebarBig) sidebarBig.textContent = formatoPct(avance);
-  if (sidebarSub) sidebarSub.textContent = `${formatoCLP(t.neto)} de ${formatoCLP(PROJECT_BUDGET)} ejecutado`;
-  if (sidebarFill) sidebarFill.style.width = `${Math.min(avance, 100)}%`;
+  if(sidebarBig) sidebarBig.textContent = formatoPct(avance);
+  if(sidebarSub) sidebarSub.textContent = `${formatoCLP(t.neto)} de ${formatoCLP(PROJECT_BUDGET)} ejecutado`;
+  if(sidebarFill) sidebarFill.style.width = `${Math.min(avance,100)}%`;
 }
-function renderAlerts() {
-  const el = $("alerts-list");
-  if (!el) return;
+function renderAlerts(){
+  const el = $("alerts-list"); if(!el) return;
+  if(!gastos.length){ el.innerHTML = emptyState("Sin alertas. No hay gastos registrados."); return; }
   const t = getTotals();
-  const avance = PROJECT_BUDGET ? (t.neto / PROJECT_BUDGET) * 100 : 0;
   const alerts = [
     ["📄", `${t.pendientesOcr} documentos pendientes OCR`, "Registros que aún requieren lectura o revisión documental."],
     ["⚠️", `${t.sinProveedor} registros incompletos`, "Gastos sin proveedor registrado o con datos pendientes."],
     ["💵", `${formatoCLP(t.iva)} de IVA crédito fiscal`, "Monto calculado desde los documentos registrados."],
-    ["📊", `${formatoPct(avance)} de avance financiero`, "Avance calculado contra presupuesto referencial."]
+    ["📊", `${formatoPct(PROJECT_BUDGET ? (t.neto/PROJECT_BUDGET)*100 : 0)} de avance financiero`, "Avance calculado contra presupuesto referencial."]
   ];
-  el.innerHTML = alerts.map(a => `
-    <div class="alert-item">
-      <div class="alert-icon">${a[0]}</div>
-      <div>
-        <div class="alert-title">${a[1]}</div>
-        <div class="alert-sub">${a[2]}</div>
-      </div>
-    </div>
-  `).join("");
+  el.innerHTML = alerts.map(a => `<div class="alert-item"><div class="alert-icon">${a[0]}</div><div><div class="alert-title">${a[1]}</div><div class="alert-sub">${a[2]}</div></div></div>`).join("");
 }
-function renderBottomCards() {}
-
-/* ── GASTOS ──────────────────────────────────────────────── */
-function gastoRowHTML(g) {
-  const safeId = String(g.id).replace(/'/g, "\\'");
-  return `
-    <div class="table-row gastos-row" data-id="${g.id}">
-      <div><input type="checkbox" class="row-chk" data-id="${g.id}" onclick="toggleRowSelect('${safeId}', this)"/></div>
-      <div>${normalizarFecha(g.fecha)}</div>
-      <div><div class="doc-name">${g.proveedor || "Pendiente OCR"}</div><div class="doc-amount">${g.observacion || ""}</div></div>
-      <div style="font-size:11px;color:#94a3b8">${g.rut || "—"}</div>
-      <div style="font-size:12px;color:#64748b">${g.tipo_documento || "—"}</div>
-      <div><span class="cat-badge ${getCategoriaClass(g.categoria)}">${g.categoria || "Sin categoría"}</span></div>
-      <div>${formatoCLP(g.neto)}</div>
-      <div>${g.iva ? formatoCLP(g.iva) : "—"}</div>
-      <div>${g.total ? formatoCLP(g.total) : "—"}</div>
-      <div style="text-align:center">${numberValue(g.iva) > 0 ? "✔" : "—"}</div>
-      <div style="font-size:12px;color:#64748b">${g.metodo_pago || "—"}</div>
-      <div class="doc-actions">
-        <button class="action-btn" type="button" onclick="openEditModal('${safeId}')">✏️</button>
-        <button class="action-btn" type="button" onclick="confirmDelete('${safeId}')">🗑️</button>
-      </div>
-    </div>
-  `;
+function renderBottomCards(){
+  const el = $("section-bottom"); if(!el) return;
+  const t = getTotals(); const ultima = gastos.length ? normalizarFecha(gastos[0].fecha) : "—";
+  const cards = [["Proveedores",t.proveedores,"Únicos registrados","🏢"],["Último registro",ultima,"Según fecha de gasto","📅"],["Total bruto",formatoCLP(t.total),"Neto + IVA","💼"],["Avance presupuesto",formatoPct(PROJECT_BUDGET ? (t.neto/PROJECT_BUDGET)*100 : 0),"Contra presupuesto referencial","📈"]];
+  el.innerHTML = cards.map(c => `<div class="bottom-card"><div class="bottom-top"><div class="bottom-label">${c[0]}</div><div class="bottom-icon">${c[3]}</div></div><div class="bottom-value">${c[1]}</div><div class="bottom-sub">${c[2]}</div></div>`).join("");
 }
-function renderDocs(limit = docsVisibleLimit) {
-  const el = $("docs-table");
-  const subtitle = $("docs-subtitle");
-  const btn = $("load-more-btn");
-  if (!el) return;
-
-  if (subtitle) subtitle.textContent = `${filteredDocs.length} registros · datos cargados desde Supabase`;
-  if (!filteredDocs.length) {
-    el.innerHTML = emptyState("No hay gastos registrados.");
-    if (btn) btn.style.display = "none";
-    updateBulkBar();
-    return;
-  }
-
-  el.innerHTML = filteredDocs.slice(0, limit).map(gastoRowHTML).join("");
-  if (btn) btn.style.display = filteredDocs.length > limit ? "inline-flex" : "none";
-  updateBulkBar();
+function renderDocs(limit = docsVisibleLimit){
+  const el=$("docs-table"), subtitle=$("docs-subtitle"), btn=$("load-more-btn"); if(!el) return;
+  if(subtitle) subtitle.textContent = `${filteredDocs.length} registros · datos cargados desde Supabase`;
+  if(!filteredDocs.length){ el.innerHTML = emptyState("No hay gastos registrados en Supabase."); if(btn) btn.style.display="none"; return; }
+  el.innerHTML = filteredDocs.slice(0, limit).map(docRowFromGasto).map(d => `<div class="table-row gastos-row"><div>${d.date}</div><div><div class="doc-name">${d.name}</div><div class="doc-amount">${d.observacion || ""}</div></div><div>${d.rut}</div><div>${d.tipo}</div><div><span class="cat-badge ${d.catCls}">${d.cat}</span></div><div>${d.costo}</div><div>${d.iva}</div><div>${d.total}</div><div>${d.cf}</div><div>${d.pago}</div><div>${d.fotoPath ? "📎" : "—"}</div></div>`).join("");
+  if(btn) btn.style.display = filteredDocs.length > limit ? "inline-flex" : "none";
 }
-function updateBulkBar() {
-  const bar = $("bulk-bar");
-  const count = $("bulk-count");
-  if (!bar) return;
-  if (selectedIds.size > 0) {
-    bar.classList.remove("bulk-bar-hidden");
-    if (count) count.textContent = `${selectedIds.size} seleccionado${selectedIds.size !== 1 ? "s" : ""}`;
-  } else {
-    bar.classList.add("bulk-bar-hidden");
-  }
-  const chkAll = $("chk-all");
-  if (chkAll) {
-    const slice = filteredDocs.slice(0, docsVisibleLimit);
-    chkAll.checked = slice.length > 0 && slice.every(g => selectedIds.has(String(g.id)));
-    chkAll.indeterminate = !chkAll.checked && slice.some(g => selectedIds.has(String(g.id)));
-  }
-}
-function toggleRowSelect(id, chk) {
-  if (chk.checked) selectedIds.add(String(id));
-  else selectedIds.delete(String(id));
-  updateBulkBar();
-}
-function toggleSelectAll(chk) {
-  const slice = filteredDocs.slice(0, docsVisibleLimit);
-  slice.forEach(g => {
-    if (chk.checked) selectedIds.add(String(g.id));
-    else selectedIds.delete(String(g.id));
-  });
-  renderDocs(docsVisibleLimit);
-}
-function cancelBulkSelection() {
-  selectedIds.clear();
-  renderDocs(docsVisibleLimit);
-}
-async function bulkDelete() {
-  if (selectedIds.size === 0) return;
-  if (!confirm(`¿Eliminar ${selectedIds.size} gasto${selectedIds.size !== 1 ? "s" : ""}?`)) return;
-  if (typeof window.supabaseClient === "undefined") {
-    alert("Sin conexión.");
-    return;
-  }
-  const ids = [...selectedIds];
-  const { error } = await window.supabaseClient.from("gastos_junquillar_app").delete().in("id", ids);
-  if (error) {
-    alert(`Error eliminando: ${error.message}`);
-    return;
-  }
-  selectedIds.clear();
-  await loadData();
-}
-function applyFilters() {
-  const text = (($("filter-text-gastos")?.value || $("global-search")?.value || "")).toLowerCase().trim();
-  const cat = $("filter-cat-gastos")?.value || "";
-  const tipo = $("filter-tipo-gastos")?.value || "";
-  const pago = $("filter-pago-gastos")?.value || "";
-  const desde = $("filter-desde-gastos")?.value || "";
-  const hasta = $("filter-hasta-gastos")?.value || "";
-
+function applyFilters(){
+  const text = (($("filter-text")?.value || $("filter-text-gastos")?.value || $("global-search")?.value || "")).toLowerCase().trim();
+  const cat = $("filter-cat")?.value || ""; const tipo=$("filter-tipo")?.value || ""; const desde=$("filter-desde")?.value || ""; const hasta=$("filter-hasta")?.value || ""; const pago=$("filter-pago")?.value || "";
   filteredDocs = gastos.filter(g => {
-    const hayTexto = [g.proveedor, g.rut, g.tipo_documento, g.numero_documento, g.categoria, g.metodo_pago, g.observacion].join(" ").toLowerCase();
-    const f = fechaOrdenable(g.fecha);
-    if (text && !hayTexto.includes(text)) return false;
-    if (cat && g.categoria !== cat) return false;
-    if (tipo && g.tipo_documento !== tipo) return false;
-    if (pago && g.metodo_pago !== pago) return false;
-    if (desde && f < desde) return false;
-    if (hasta && f > hasta) return false;
-    return true;
+    const hayTexto = [g.proveedor,g.rut,g.tipo_documento,g.numero_documento,g.categoria,g.metodo_pago,g.observacion].join(" ").toLowerCase(); const f = fechaOrdenable(g.fecha);
+    if(text && !hayTexto.includes(text)) return false; if(cat && g.categoria !== cat) return false; if(tipo && g.tipo_documento !== tipo) return false; if(pago && g.metodo_pago !== pago) return false; if(desde && f < desde) return false; if(hasta && f > hasta) return false; return true;
   });
-  docsVisibleLimit = 10;
-  renderDocs();
+  docsVisibleLimit=10; renderDocs();
 }
-function clearFilters() {
-  ["filter-text-gastos", "filter-cat-gastos", "filter-tipo-gastos", "filter-desde-gastos", "filter-hasta-gastos", "filter-pago-gastos", "global-search"].forEach(id => {
-    const el = $(id);
-    if (el) el.value = "";
-  });
-  filteredDocs = [...gastos];
-  docsVisibleLimit = 10;
-  renderDocs();
+function clearFilters(){
+  ["filter-text","filter-text-gastos","global-search","filter-cat","filter-tipo","filter-desde","filter-hasta","filter-pago"].forEach(id => { const el=$(id); if(el) el.value=""; });
+  filteredDocs=[...gastos]; docsVisibleLimit=10; renderDocs();
 }
-
-/* ── MODAL / DELETE ─────────────────────────────────────── */
-function openEditModal(id) {
-  const g = gastos.find(x => String(x.id) === String(id));
-  if (!g) return;
-  editModalGasto = g;
-  const m = $("modal-overlay");
-  if (!m) return;
-  $("em-fecha").value = g.fecha || "";
-  $("em-proveedor").value = g.proveedor || "";
-  $("em-rut").value = g.rut || "";
-  $("em-tipo").value = g.tipo_documento || "";
-  $("em-ndoc").value = g.numero_documento || "";
-  $("em-neto").value = g.neto || "";
-  $("em-iva").value = g.iva || "";
-  $("em-total").value = g.total || "";
-  $("em-cat").value = g.categoria || "";
-  $("em-pago").value = g.metodo_pago || "";
-  $("em-obs").value = g.observacion || "";
-  m.classList.remove("modal-hidden");
+function renderProveedores(){
+  const el=$("proveedores-table"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin proveedores. No hay gastos registrados."); return; }
+  const groups=groupBy(gastos,g=>g.proveedor||"Pendiente OCR"), totalNeto=sumBy(gastos,"neto");
+  el.innerHTML = Object.entries(groups).map(([name,rows]) => ({name, rut:rows.find(r=>r.rut)?.rut||"—", cat:rows.find(r=>r.categoria)?.categoria||"Sin categoría", docs:rows.length, costo:sumBy(rows,"neto"), iva:sumBy(rows,"iva")})).sort((a,b)=>b.costo-a.costo).slice(0,20).map((p,i)=>`<div class="table-row prov-row"><div>${i+1}</div><div class="doc-name">${p.name}</div><div>${p.rut}</div><div><span class="cat-badge ${getCategoriaClass(p.cat)}">${p.cat}</span></div><div>${p.docs}</div><div>${formatoCLP(p.costo)}</div><div>${formatoCLP(p.iva)}</div><div>${formatoPct(totalNeto ? (p.costo/totalNeto)*100 : 0)}</div></div>`).join("");
 }
-function closeEditModal() {
-  $("modal-overlay")?.classList.add("modal-hidden");
-  editModalGasto = null;
+function renderCaja(){ renderCajaKpis(); renderCajaTipos(); renderCajaMensual(); }
+function renderCajaKpis(){
+  const el=$("caja-kpis"); if(!el) return; const t=getTotals(); const docsConIva = gastos.filter(g=>numberValue(g.iva)>0).length;
+  const cards = [["Costo neto registrado",formatoCLP(t.neto),`${t.docs} documentos registrados`],["IVA crédito fiscal",formatoCLP(t.iva),"Calculado desde IVA registrado"],["Total documentos",formatoCLP(t.total),"Neto + IVA"],["Docs con IVA",docsConIva,"Documentos con crédito fiscal"]];
+  el.innerHTML = cards.map(c=>`<div class="kpi-card"><div class="kpi-top"><div><div class="kpi-title">${c[0]}</div><div class="kpi-value">${c[1]}</div></div></div><div class="kpi-footer">${c[2]}</div></div>`).join("");
 }
-async function saveEditModal() {
-  if (!editModalGasto) return;
-  const updates = {
-    fecha: $("em-fecha")?.value || editModalGasto.fecha,
-    proveedor: $("em-proveedor")?.value || null,
-    rut: $("em-rut")?.value || null,
-    tipo_documento: $("em-tipo")?.value || null,
-    numero_documento: $("em-ndoc")?.value || null,
-    neto: numberValue($("em-neto")?.value),
-    iva: numberValue($("em-iva")?.value),
-    total: numberValue($("em-total")?.value),
-    categoria: $("em-cat")?.value || null,
-    metodo_pago: $("em-pago")?.value || null,
-    observacion: $("em-obs")?.value || null
-  };
-  if (typeof window.supabaseClient === "undefined") {
-    alert("Sin conexión a Supabase.");
-    return;
-  }
-  const { error } = await window.supabaseClient.from("gastos_junquillar_app").update(updates).eq("id", editModalGasto.id);
-  if (error) {
-    alert(`Error guardando: ${error.message}`);
-    return;
-  }
-  closeEditModal();
-  await loadData();
+function renderCajaTipos(){
+  const el=$("caja-tipos"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin información tributaria. No hay gastos registrados."); return; }
+  const groups=groupBy(gastos,g=>g.tipo_documento||"Sin tipo");
+  el.innerHTML=Object.entries(groups).map(([tipo,rows])=>`<div class="table-row caja-tipos-row"><div>${tipo}</div><div>${rows.length}</div><div>${formatoCLP(sumBy(rows,"neto"))}</div><div>${formatoCLP(sumBy(rows,"iva"))}</div><div>${sumBy(rows,"iva")>0?"✔":"—"}</div><div>${sumBy(rows,"iva")>0?"IVA Crédito Fiscal registrado":"Sin IVA registrado"}</div></div>`).join("");
 }
-async function confirmDelete(id) {
-  const g = gastos.find(x => String(x.id) === String(id));
-  const nombre = g?.proveedor || "este gasto";
-  if (!confirm(`¿Eliminar el gasto de "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
-  if (typeof window.supabaseClient === "undefined") {
-    alert("Sin conexión.");
-    return;
-  }
-  const { error } = await window.supabaseClient.from("gastos_junquillar_app").delete().eq("id", id);
-  if (error) {
-    alert(`Error eliminando: ${error.message}`);
-    return;
-  }
-  await loadData();
+function renderCajaMensual(){
+  const el=$("caja-mensual"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin detalle mensual."); return; }
+  const groups=groupBy(gastos,g=>mesLabel(g.fecha)); let acum=0;
+  el.innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([mes,rows])=>{ const iva=sumBy(rows,"iva"); acum+=iva; return `<div class="table-row caja-mensual-row"><div>${mes}</div><div>${rows.filter(r=>numberValue(r.iva)>0).length}</div><div>${formatoCLP(sumBy(rows,"neto"))}</div><div>${formatoCLP(iva)}</div><div>${formatoCLP(acum)}</div></div>`; }).join("");
 }
-
-/* ── PROVEEDORES / CAJA ─────────────────────────────────── */
-function renderProveedores() {
-  const el = $("proveedores-table");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin proveedores.");
-    return;
-  }
-  const groups = groupBy(gastos, g => g.proveedor || "Pendiente OCR");
-  const totalNeto = sumBy(gastos, "neto");
-  el.innerHTML = Object.entries(groups)
-    .map(([name, rows]) => ({
-      name,
-      rut: rows.find(r => r.rut)?.rut || "—",
-      cat: rows.find(r => r.categoria)?.categoria || "Sin categoría",
-      docs: rows.length,
-      costo: sumBy(rows, "neto"),
-      iva: sumBy(rows, "iva")
-    }))
-    .sort((a, b) => b.costo - a.costo)
-    .slice(0, 20)
-    .map((p, i) => `
-      <div class="table-row prov-row">
-        <div>${i + 1}</div>
-        <div class="doc-name">${p.name}</div>
-        <div>${p.rut}</div>
-        <div><span class="cat-badge ${getCategoriaClass(p.cat)}">${p.cat}</span></div>
-        <div>${p.docs}</div>
-        <div>${formatoCLP(p.costo)}</div>
-        <div>${formatoCLP(p.iva)}</div>
-        <div>${formatoPct(totalNeto ? (p.costo / totalNeto) * 100 : 0)}</div>
-      </div>
-    `).join("");
+function renderBalance(){
+  const el=$("balance-table"); if(!el) return; const t=getTotals(); if(!gastos.length){ el.innerHTML=emptyState("Balance sin movimientos. No hay gastos registrados."); return; }
+  const rows = [["1","Obra en Curso",t.neto,0,t.neto,0,t.neto,0,0,0],["2","IVA Crédito Fiscal",t.iva,0,t.iva,0,t.iva,0,0,0],["3","Financiamiento / Caja / Cuentas por pagar",0,t.total,0,t.total,0,t.total,0,0]];
+  el.innerHTML = rows.map(r=>`<div class="table-row balance-row"><div>${r[0]}</div><div class="doc-name">${r[1]}</div><div>${formatoCLP(r[2])}</div><div>${formatoCLP(r[3])}</div><div>${formatoCLP(r[4])}</div><div>${formatoCLP(r[5])}</div><div>${formatoCLP(r[6])}</div><div>${formatoCLP(r[7])}</div><div>${formatoCLP(r[8])}</div><div>${formatoCLP(r[9])}</div></div>`).join("");
 }
-function renderCaja() {
-  renderCajaKpis();
-  renderCajaTipos();
-  renderCajaMensual();
+function renderControlProyecto(){ renderControlKpis(); renderControlEtapas(); renderControlHitos(); renderControlCat(); }
+function renderControlKpis(){
+  const el=$("control-kpis"); if(!el) return; const t=getTotals(); const avance = PROJECT_BUDGET ? (t.neto/PROJECT_BUDGET)*100 : 0;
+  const cards = [["Avance financiero",formatoPct(avance),`${formatoCLP(t.neto)} ejecutado`],["Presupuesto referencial",formatoCLP(PROJECT_BUDGET),"Base de comparación"],["Saldo estimado",formatoCLP(Math.max(PROJECT_BUDGET-t.neto,0)),"Presupuesto menos neto ejecutado"],["Partidas con gasto",uniqueCount(gastos,"categoria"),"Categorías registradas"]];
+  el.innerHTML = cards.map(c=>`<div class="kpi-card"><div class="kpi-title">${c[0]}</div><div class="kpi-value">${c[1]}</div><div class="kpi-footer">${c[2]}</div></div>`).join("");
 }
-function renderCajaKpis() {
-  const el = $("caja-kpis");
-  if (!el) return;
-  const t = getTotals();
-  const cards = [
-    ["Costo neto registrado", formatoCLP(t.neto), `${t.docs} documentos`],
-    ["IVA crédito fiscal", formatoCLP(t.iva), "Desde IVA registrado"],
-    ["Total documentos", formatoCLP(t.total), "Neto + IVA"],
-    ["Docs con IVA", t.docsConCF, "Con crédito fiscal"]
-  ];
-  el.innerHTML = cards.map(c => `
-    <div class="kpi-card">
-      <div class="kpi-title">${c[0]}</div>
-      <div class="kpi-value">${c[1]}</div>
-      <div class="kpi-footer">${c[2]}</div>
-    </div>
-  `).join("");
+function renderControlEtapas(){
+  const el=$("control-etapas"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin avance registrado. No hay gastos para calcular etapas."); return; }
+  const groups=groupBy(gastos,g=>g.categoria||"Sin categoría"), total=sumBy(gastos,"neto");
+  el.innerHTML=Object.entries(groups).map(([cat,rows])=>{ const monto=sumBy(rows,"neto"), pct=total?(monto/total)*100:0; return `<div class="etapa-card"><div class="etapa-title">${cat}</div><div class="etapa-value">${formatoCLP(monto)}</div><div class="cat-track"><div class="cat-fill" style="width:${Math.min(pct,100)}%"></div></div><div class="etapa-sub">${formatoPct(pct)} del gasto registrado</div></div>`; }).join("");
 }
-function renderCajaTipos() {
-  const el = $("caja-tipos");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin información.");
-    return;
-  }
-  const groups = groupBy(gastos, x => x.tipo_documento || "Sin tipo");
-  el.innerHTML = Object.entries(groups).map(([tipo, rows]) => `
-    <div class="table-row caja-tipos-row">
-      <div>${tipo}</div>
-      <div>${rows.length}</div>
-      <div>${formatoCLP(sumBy(rows, "neto"))}</div>
-      <div>${formatoCLP(sumBy(rows, "iva"))}</div>
-      <div>${sumBy(rows, "iva") > 0 ? "✔" : "—"}</div>
-      <div>${sumBy(rows, "iva") > 0 ? "IVA CF" : "Sin IVA"}</div>
-    </div>
-  `).join("");
+function renderControlHitos(){
+  const el=$("control-hitos"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin hitos calculados. No hay gastos registrados."); return; }
+  const t=getTotals(); const hitos = [["Documentación", t.pendientesOcr>0?"Pendiente":"Completo", `${t.pendientesOcr} documentos pendientes OCR`],["Presupuesto", t.neto>PROJECT_BUDGET?"Sobre presupuesto":"En control", `${formatoCLP(t.neto)} ejecutado`],["Proveedores", t.proveedores>0?"Con actividad":"Sin actividad", `${t.proveedores} proveedores registrados`]];
+  el.innerHTML=hitos.map(h=>`<div class="hito-row"><div class="doc-name">${h[0]}</div><div><span class="status ${h[1]==="En control"||h[1]==="Completo"||h[1]==="Con actividad"?"s-green":"s-amber"}">${h[1]}</span></div><div>${h[2]}</div></div>`).join("");
 }
-function renderCajaMensual() {
-  const el = $("caja-mensual");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin detalle.");
-    return;
-  }
-  const groups = groupBy(gastos, x => mesLabel(x.fecha));
-  let acum = 0;
-  el.innerHTML = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([mes, rows]) => {
-    const iva = sumBy(rows, "iva");
-    acum += iva;
-    return `
-      <div class="table-row caja-mensual-row">
-        <div>${mes}</div>
-        <div>${rows.filter(r => numberValue(r.iva) > 0).length}</div>
-        <div>${formatoCLP(sumBy(rows, "neto"))}</div>
-        <div>${formatoCLP(iva)}</div>
-        <div>${formatoCLP(acum)}</div>
-      </div>
-    `;
-  }).join("");
+function renderControlCat(){
+  const el=$("control-cat"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin costos por categoría."); return; }
+  const catGroups=groupBy(gastos,g=>g.categoria||"Sin categoría"), total=sumBy(gastos,"neto"), months=[...new Set(gastos.map(g=>mesLabel(g.fecha)))].sort();
+  el.innerHTML=Object.entries(catGroups).map(([cat,rows])=>{ const byMonth=groupBy(rows,r=>mesLabel(r.fecha)), catTotal=sumBy(rows,"neto"); const vals=Array.from({length:5}).map((_,i)=>`<div>${months[i]?formatoCLP(sumBy(byMonth[months[i]]||[],"neto")):"—"}</div>`).join(""); return `<div class="table-row ctrl-cat-row"><div><span class="cat-badge ${getCategoriaClass(cat)}">${cat}</span></div><div>Gasto</div>${vals}<div>${formatoCLP(catTotal)}</div><div>${formatoPct(total?(catTotal/total)*100:0)}</div></div>`; }).join("");
 }
-
-/* ── BALANCE ─────────────────────────────────────────────── */
-function getBalanceRows() {
-  const t = getTotals();
-  const TERRENO = 100000000;
-  const APORTE_SOCIO = 60000000;
-  const activoTerreno = TERRENO;
-  const activoObra = t.neto;
-  const activoIva = t.iva;
-  const totalActivos = activoTerreno + activoObra + activoIva;
-  const pasivoSocio = APORTE_SOCIO;
-  const pasivoGastos = t.total;
-  const totalPasivos = pasivoSocio + pasivoGastos;
-  const ajuste = totalActivos - totalPasivos;
-
-  const rows = [
-    ["N°", "Cuenta", "Debe", "Haber", "Deudor", "Acreedor", "Activo", "Pasivo", "Pérdida", "Ganancia"],
-    ["", "ACTIVOS", "", "", "", "", "", "", "", ""],
-    ["1", "Terreno", activoTerreno, 0, activoTerreno, 0, activoTerreno, 0, 0, 0],
-    ["2", "Obra en Curso", activoObra, 0, activoObra, 0, activoObra, 0, 0, 0],
-    ["3", "IVA Crédito Fiscal", activoIva, 0, activoIva, 0, activoIva, 0, 0, 0],
-    ["", "PASIVOS", "", "", "", "", "", "", "", ""],
-    ["4", "Cuenta por pagar al Socio", 0, pasivoSocio, 0, pasivoSocio, 0, pasivoSocio, 0, 0],
-    ["5", "Gastos por pagar", 0, pasivoGastos, 0, pasivoGastos, 0, pasivoGastos, 0, 0]
-  ];
-
-  if (ajuste !== 0) {
-    rows.push([
-      "6",
-      ajuste > 0 ? "Capital pendiente" : "Ajuste",
-      ajuste > 0 ? ajuste : 0,
-      ajuste < 0 ? Math.abs(ajuste) : 0,
-      ajuste > 0 ? ajuste : 0,
-      ajuste < 0 ? Math.abs(ajuste) : 0,
-      0,
-      0,
-      ajuste < 0 ? Math.abs(ajuste) : 0,
-      ajuste > 0 ? ajuste : 0
-    ]);
-  }
-
-  rows.push(["", "TOTAL", totalActivos, totalPasivos + (ajuste > 0 ? ajuste : 0), totalActivos, totalPasivos + (ajuste > 0 ? ajuste : 0), totalActivos, totalPasivos, ajuste < 0 ? Math.abs(ajuste) : 0, ajuste > 0 ? ajuste : 0]);
-  return rows;
+function renderReportes(){ renderReportesCat(); renderReportesEtapas(); }
+function renderReportesCat(){
+  const el=$("reportes-cat"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin reporte por categoría."); return; }
+  const groups=groupBy(gastos,g=>g.categoria||"Sin categoría"), total=sumBy(gastos,"neto");
+  el.innerHTML=Object.entries(groups).map(([cat,rows])=>({cat,monto:sumBy(rows,"neto"),docs:rows.length})).sort((a,b)=>b.monto-a.monto).map(r=>`<div class="report-row"><div class="report-label">${r.cat}</div><div class="report-value">${formatoCLP(r.monto)}</div><div class="cat-track"><div class="cat-fill" style="width:${Math.min(total?(r.monto/total)*100:0,100)}%"></div></div><div class="report-sub">${r.docs} docs · ${formatoPct(total?(r.monto/total)*100:0)}</div></div>`).join("");
 }
-function renderBalance() {
-  const el = $("balance-table");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin movimientos.");
-    return;
-  }
-  const rows = getBalanceRows();
-  const header = rows[0];
-  const body = rows.slice(1);
-  el.innerHTML =
-    `<div class="table-head balance-head">${header.map(h => `<div>${h}</div>`).join("")}</div>` +
-    body.map(r => {
-      const isSection = !r[0] && r[1] && r.slice(2).every(v => v === "");
-      if (isSection) return `<div class="balance-section-row">${r[1]}</div>`;
-      const isTotal = r[1] === "TOTAL";
-      return `<div class="table-row balance-row ${isTotal ? "balance-total-row" : ""}">
-        ${r.map((v, i) => `<div>${i > 1 ? formatoCLP(v) : v}</div>`).join("")}
-      </div>`;
-    }).join("");
+function renderReportesEtapas(){
+  const el=$("reportes-etapas"); if(!el) return; if(!gastos.length){ el.innerHTML=emptyState("Sin reporte mensual."); return; }
+  const groups=groupBy(gastos,g=>mesLabel(g.fecha));
+  el.innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([mes,rows])=>`<div class="report-row"><div class="report-label">${mes}</div><div class="report-value">${formatoCLP(sumBy(rows,"neto"))}</div><div class="report-sub">${rows.length} documentos · IVA ${formatoCLP(sumBy(rows,"iva"))}</div></div>`).join("");
 }
-
-/* ── CONTROL ─────────────────────────────────────────────── */
-function renderControlProyecto() {
-  renderControlEtapas();
-  renderControlCat();
-  renderBudgetEditor();
+function updateVisibleSections(ids=[]){ document.querySelectorAll(".module-block").forEach(s=>s.classList.add("module-hidden")); ids.forEach(id=>$(id)?.classList.remove("module-hidden")); }
+function setupNavigation(){
+  const buttons=document.querySelectorAll(".nav-btn"), title=$("page-title"), subtitle=$("page-subtitle");
+  buttons.forEach(button=>button.addEventListener("click",()=>{ buttons.forEach(btn=>btn.classList.remove("active")); button.classList.add("active"); currentView=button.dataset.view; const view=views[currentView]||views.resumen; if(title) title.textContent=view.title; if(subtitle) subtitle.textContent=view.subtitle; updateVisibleSections(view.visible); docsVisibleLimit=(currentView==="gastos"||currentView==="documentos")?10:3; renderDocs(docsVisibleLimit); }));
+  $("btn-ver-reportes")?.addEventListener("click",()=>document.querySelector('[data-view="reportes"]')?.click());
 }
-function renderControlEtapas() {
-  const el = $("control-etapas");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin avance registrado.");
-    return;
-  }
-  const groups = groupBy(gastos, g => g.categoria || "Sin categoría");
-  const total = sumBy(gastos, "neto");
-  el.innerHTML = `<div class="etapas-grid">${Object.entries(groups).map(([cat, rows]) => {
-    const monto = sumBy(rows, "neto");
-    const p = total ? (monto / total) * 100 : 0;
-    return `
-      <div class="etapa-card">
-        <div class="etapa-header"><div class="etapa-nombre">${cat}</div><span class="estado-badge estado-activo">Activo</span></div>
-        <div class="etapa-value">${formatoCLP(monto)}</div>
-        <div class="etapa-progress-bar"><div class="etapa-progress-fill" style="width:${Math.min(p, 100)}%"></div></div>
-        <div class="etapa-sub">${rows.length} documentos · ${formatoPct(p)}</div>
-      </div>
-    `;
-  }).join("")}</div>`;
+function renderAll(){ renderKPIs(); renderAlerts(); renderBottomCards(); renderDocs(docsVisibleLimit); renderProveedores(); renderCaja(); renderBalance(); renderControlProyecto(); renderReportes(); }
+function rowsToCSV(rows){
+  const headers=["fecha","proveedor","rut","tipo_documento","numero_documento","categoria","neto","iva","total","metodo_pago","estado_ocr","foto_path"];
+  const esc = v => `"${String(v ?? "").replace(/"/g,'""')}"`;
+  return [headers.join(";"), ...rows.map(r=>headers.map(h=>esc(r[h])).join(";"))].join("\n");
 }
-function renderControlCat() {
-  const el = $("control-cat");
-  if (!el) return;
-  if (!gastos.length) {
-    el.innerHTML = emptyState("Sin costos.");
-    return;
-  }
-  const cg = groupBy(gastos, g => g.categoria || "Sin categoría");
-  const total = sumBy(gastos, "neto");
-  const months = [...new Set(gastos.map(g => mesLabel(g.fecha)))].sort();
-  el.innerHTML = Object.entries(cg).map(([cat, rows]) => {
-    const byMonth = groupBy(rows, r => mesLabel(r.fecha));
-    const catTotal = sumBy(rows, "neto");
-    const vals = Array.from({ length: 5 }).map((_, i) => `<div>${months[i] ? formatoCLP(sumBy(byMonth[months[i]] || [], "neto")) : "—"}</div>`).join("");
-    return `<div class="table-row ctrl-cat-row"><div>${cat}</div><div>Gasto</div>${vals}<div>${formatoCLP(catTotal)}</div><div>${formatoPct(total ? (catTotal / total) * 100 : 0)}</div></div>`;
-  }).join("");
+function downloadText(filename,text){ const blob=new Blob([text],{type:"text/csv;charset=utf-8"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
+function exportCSV(){ downloadText("gastos_junquillar.csv", rowsToCSV(filteredDocs)); }
+function setupButtons(){
+  $("load-more-btn")?.addEventListener("click",()=>{ docsVisibleLimit += 20; renderDocs(docsVisibleLimit); });
+  $("btn-aplicar-filtros")?.addEventListener("click",applyFilters);
+  $("btn-limpiar-filtros")?.addEventListener("click",clearFilters);
+  $("btn-export-csv")?.addEventListener("click",exportCSV);
+  $("btn-export-excel")?.addEventListener("click",exportCSV);
+  ["filter-text","filter-text-gastos","global-search"].forEach(id => $(id)?.addEventListener("input", applyFilters));
 }
-function renderBudgetEditor() {
-  const el = $("budget-editor");
-  if (!el) return;
-  el.innerHTML = `
-    <div class="budget-edit-row">
-      <span class="budget-edit-label">Presupuesto del proyecto</span>
-      <div class="budget-edit-controls">
-        <input type="text" id="budget-input" class="budget-input" value="${PROJECT_BUDGET.toLocaleString("es-CL")}" placeholder="180.000.000"/>
-        <button class="budget-save-btn" id="btn-save-budget">Guardar</button>
-      </div>
-    </div>
-  `;
-  $("btn-save-budget")?.addEventListener("click", async () => {
-    const val = numberValue($("budget-input")?.value);
-    if (!val || val < 1000) {
-      alert("Ingresa un presupuesto válido.");
-      return;
-    }
-    await saveBudget(val);
-    alert(`✅ Presupuesto actualizado a ${formatoCLP(val)}`);
-  });
-}
-
-/* ── REPORTES ────────────────────────────────────────────── */
-function getCategoriaBudget(cat) {
-  const map = { "Materiales": 0.42, "Mano de obra": 0.32, "Servicios": 0.10, "Herramientas": 0.08, "Transporte": 0.08 };
-  return PROJECT_BUDGET * (map[cat] || 0);
-}
-function getTopCategoria() {
-  const groups = groupBy(gastos, r => r.categoria || "Sin categoría");
-  const top = Object.entries(groups)
-    .map(([cat, rs]) => [cat, sumBy(rs, "neto")])
-    .sort((a, b) => b[1] - a[1])[0];
-  return top?.[0] || "";
-}
-function renderReportes() {
-  actualizarVistaReportes();
-  agregarBotonesBalanceDetalle();
-}
-function actualizarVistaReportes() {
-  const t = getTotals();
-  const avance = PROJECT_BUDGET ? (t.neto / PROJECT_BUDGET) * 100 : 0;
-
-  setText("kpi-presupuesto", formatoCLP(PROJECT_BUDGET));
-  setText("kpi-ejecutado", formatoCLP(t.neto));
-  setText("kpi-avance", formatoPct(avance));
-  setText("kpi-iva", formatoCLP(t.iva));
-
-  const bar = $("kpi-avance-bar");
-  if (bar) bar.style.width = `${Math.min(Math.max(avance, 0), 100)}%`;
-
-  setText("report-updated", `Última actualización: ${new Date().toLocaleString("es-CL")}`);
-
-  const topCat = getTopCategoria();
-  setText("diagnostico-text", `${avance > 0 ? "El proyecto mantiene un avance financiero controlado según los datos disponibles." : "El proyecto aún no registra ejecución financiera suficiente para un diagnóstico completo."} La mayor concentración de gasto está en ${topCat || "las categorías registradas"}. El IVA crédito fiscal acumulado asciende a ${formatoCLP(t.iva)} y debe mantenerse separado para revisión tributaria.`);
-
-  const alertas = $("alertas-list");
-  if (alertas) {
-    alertas.innerHTML = `
-      <div class="alerta-item alerta-success">✅ Sin sobrecostos críticos contra el presupuesto total.</div>
-      <div class="alerta-item alerta-info">ℹ️ ${t.docsSinCF} documento(s) sin crédito fiscal registrado.</div>
-      <div class="alerta-item alerta-success">✅ Documentación tributaria visible en el sistema.</div>
-    `;
-  }
-
-  renderResumenCategoria();
-  setText("trib-base-neta", formatoCLP(t.neto));
-  setText("trib-iva-cf", formatoCLP(t.iva));
-  setText("trib-docs-cf", String(t.docsConCF));
-  setText("trib-docs-sin-cf", String(t.docsSinCF));
-
-  renderGraficosSimples();
-}
-function renderResumenCategoria() {
-  const body = $("resumen-categoria-body");
-  if (!body) return;
-  const groups = groupBy(gastos, r => r.categoria || "Sin categoría");
-  if (!gastos.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-cell">Sin datos disponibles</td></tr>`;
-    return;
-  }
-  body.innerHTML = CATEGORIAS.map(cat => {
-    const ejecutado = sumBy(groups[cat] || [], "neto");
-    const ppto = getCategoriaBudget(cat);
-    const dif = ppto - ejecutado;
-    const av = ppto ? (ejecutado / ppto) * 100 : 0;
-    return `
-      <tr>
-        <td>${cat}</td>
-        <td class="money">${formatoCLP(ppto)}</td>
-        <td class="money">${formatoCLP(ejecutado)}</td>
-        <td class="money ${dif < 0 ? "desv-neg" : "desv-pos"}">${formatoCLP(dif)}</td>
-        <td class="money">${formatoPct(av)}</td>
-      </tr>
-    `;
-  }).join("");
-}
-function renderGraficosSimples() {
-  renderBarChart("chart-presupuesto");
-  renderDonutLegend("chart-categoria");
-  renderLineSimple("chart-mensual");
-}
-function renderBarChart(id) {
-  const el = $(id);
-  if (!el) return;
-  const groups = groupBy(gastos, r => r.categoria || "Sin categoría");
-  const max = Math.max(...CATEGORIAS.map(cat => getCategoriaBudget(cat)), ...CATEGORIAS.map(cat => sumBy(groups[cat] || [], "neto")), 1);
-  el.innerHTML = `
-    <div class="simple-chart-bars">
-      ${CATEGORIAS.map(cat => {
-        const ppto = getCategoriaBudget(cat);
-        const eje = sumBy(groups[cat] || [], "neto");
-        return `
-          <div class="simple-bar-group">
-            <div class="simple-bars">
-              <span class="simple-bar simple-bar-budget" style="height:${Math.max((ppto / max) * 100, 2)}%"></span>
-              <span class="simple-bar simple-bar-real" style="height:${Math.max((eje / max) * 100, 2)}%"></span>
-            </div>
-            <div class="simple-bar-label">${cat}</div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-    <div class="simple-legend"><span>Presupuesto</span><span>Ejecutado</span></div>
-  `;
-}
-function renderDonutLegend(id) {
-  const el = $(id);
-  if (!el) return;
-  const groups = groupBy(gastos, r => r.categoria || "Sin categoría");
-  const total = sumBy(gastos, "neto");
-  const items = CATEGORIAS.map(cat => {
-    const monto = sumBy(groups[cat] || [], "neto");
-    return { cat, monto, percent: total ? (monto / total) * 100 : 0 };
-  }).filter(i => i.monto > 0);
-
-  if (!items.length) {
-    el.innerHTML = `<div class="empty-state">Sin datos para graficar.</div>`;
-    return;
-  }
-
-  el.innerHTML = `
-    <div class="simple-donut"><div class="simple-donut-center">${formatoCLP(total)}</div></div>
-    <div class="simple-donut-list">
-      ${items.map(i => `<div><span>${i.cat}</span><strong>${formatoPct(i.percent)}</strong></div>`).join("")}
-    </div>
-  `;
-}
-function renderLineSimple(id) {
-  const el = $(id);
-  if (!el) return;
-  const groups = groupBy(gastos, r => mesLabel(r.fecha));
-  const items = Object.entries(groups)
-    .map(([mes, rows]) => ({ mes, monto: sumBy(rows, "neto") }))
-    .slice(-6);
-
-  if (!items.length) {
-    el.innerHTML = `<div class="empty-state">Sin datos para graficar.</div>`;
-    return;
-  }
-
-  const max = Math.max(...items.map(i => i.monto), 1);
-  el.innerHTML = `
-    <div class="simple-line-chart">
-      ${items.map(i => `
-        <div class="simple-line-point">
-          <div class="simple-line-value" style="height:${Math.max((i.monto / max) * 100, 6)}%"></div>
-          <span>${i.mes}</span>
-          <strong>${formatoCLP(i.monto)}</strong>
-        </div>
-      `).join("")}
-    </div>
-  `;
-}
-function toggleDetalle() {
-  const extras = $("report-extras");
-  if (!extras) {
-    alert("No se encontró el bloque de detalle de reportes.");
-    return;
-  }
-  const isHidden = extras.style.display === "none" || getComputedStyle(extras).display === "none";
-  extras.style.display = isHidden ? "block" : "none";
-
-  const btn = $("btn-ver-detalle");
-  if (btn) btn.textContent = isHidden ? "👁️ Ocultar detalle" : "👁️ Ver detalle";
-
-  if (isHidden) {
-    agregarBotonesBalanceDetalle();
-    extras.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-}
-function agregarBotonesBalanceDetalle() {
-  const cont = $("reportes-export");
-  if (!cont || $("btn-balance-real-excel")) return;
-  const wrap = document.createElement("div");
-  wrap.className = "export-btns";
-  wrap.style.marginTop = "12px";
-  wrap.innerHTML = `
-    <button class="export-btn export-btn-xl" id="btn-balance-real-excel" type="button">⬇ Balance Excel</button>
-    <button class="export-btn" id="btn-balance-real-csv" type="button">⬇ Balance CSV</button>
-  `;
-  cont.prepend(wrap);
-  $("btn-balance-real-excel")?.addEventListener("click", exportToExcel);
-  $("btn-balance-real-csv")?.addEventListener("click", exportBalanceCSV);
-}
-
-/* ── EXPORTACIONES ───────────────────────────────────────── */
-function rowsToCSV(rows) {
-  return rows.map(row => row.map(csvEscape).join(";")).join("\n");
-}
-function exportCSV() {
-  const headers = ["fecha", "proveedor", "rut", "tipo_documento", "numero_documento", "categoria", "neto", "iva", "total", "metodo_pago", "estado_ocr"];
-  const rows = [headers, ...filteredDocs.map(r => headers.map(h => r[h] ?? ""))];
-  downloadBlob("gastos_junquillar.csv", rowsToCSV(rows), "text/csv;charset=utf-8");
-}
-function getReporteEjecutivoRows() {
-  const t = getTotals();
-  const avance = PROJECT_BUDGET ? (t.neto / PROJECT_BUDGET) * 100 : 0;
-  const groups = groupBy(gastos, r => r.categoria || "Sin categoría");
-  return [
-    ["Reporte Ejecutivo — Casa Junquillar"],
-    ["Fecha de exportación", new Date().toLocaleString("es-CL")],
-    [],
-    ["Indicador", "Valor"],
-    ["Presupuesto total", formatoCLP(PROJECT_BUDGET)],
-    ["Ejecutado neto", formatoCLP(t.neto)],
-    ["Avance financiero", formatoPct(avance)],
-    ["IVA crédito acumulado", formatoCLP(t.iva)],
-    ["Documentos con CF", t.docsConCF],
-    ["Documentos sin CF", t.docsSinCF],
-    [],
-    ["Categoría", "Presupuesto", "Ejecutado", "Diferencia", "% Avance"],
-    ...CATEGORIAS.map(cat => {
-      const ejecutado = sumBy(groups[cat] || [], "neto");
-      const ppto = getCategoriaBudget(cat);
-      return [cat, formatoCLP(ppto), formatoCLP(ejecutado), formatoCLP(ppto - ejecutado), formatoPct(ppto ? (ejecutado / ppto) * 100 : 0)];
-    })
-  ];
-}
-function getBalanceExportRows() {
-  return getBalanceRows().map((row, idx) => idx === 0 ? row : row.map((v, i) => i > 1 && typeof v === "number" ? v : v));
-}
-function exportBalanceCSV() {
-  const rows = [
-    ["Balance General — Proyecto Casa Junquillar"],
-    ["Fecha de exportación", new Date().toLocaleString("es-CL")],
-    [],
-    ...getBalanceExportRows()
-  ];
-  downloadBlob(`balance-general-casa-junquillar-${new Date().toISOString().slice(0, 10)}.csv`, rowsToCSV(rows), "text/csv;charset=utf-8");
-}
-function exportToExcel() {
-  actualizarVistaReportes();
-  renderBalance();
-
-  const reporteRows = getReporteEjecutivoRows();
-  const balanceRows = [
-    ["Balance General — Proyecto Casa Junquillar"],
-    ["Fecha de exportación", new Date().toLocaleString("es-CL")],
-    [],
-    ...getBalanceExportRows()
-  ];
-
-  if (window.XLSX) {
-    const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(reporteRows), "Reporte Ejecutivo");
-    window.XLSX.utils.book_append_sheet(wb, window.XLSX.utils.aoa_to_sheet(balanceRows), "Balance");
-    window.XLSX.writeFile(wb, `reporte-junquillar-${new Date().toISOString().slice(0, 10)}.xlsx`);
-    return;
-  }
-
-  downloadBlob(`reporte-junquillar-${new Date().toISOString().slice(0, 10)}.csv`, rowsToCSV(reporteRows.concat([[], ["BALANCE"], ...balanceRows])), "text/csv;charset=utf-8");
-}
-function exportToPDF() {
-  actualizarVistaReportes();
-  renderBalance();
-
-  const report = $("section-reportes");
-  const balance = $("section-balance");
-  const html = `
-    <!doctype html>
-    <html lang="es">
-    <head>
-      <meta charset="utf-8">
-      <title>Reporte Ejecutivo — Casa Junquillar</title>
-      <link rel="stylesheet" href="styles.css">
-      <style>
-        body{background:#fff;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
-        .layout,.main,.content{display:block;padding:0;margin:0;}
-        .module-hidden{display:block!important;}
-        .sidebar,.header,.report-header-actions,.bell-btn,.search-wrap{display:none!important;}
-        .card{break-inside:avoid;margin-bottom:16px;box-shadow:none!important;}
-        @media print{body{padding:0}}
-      </style>
-    </head>
-    <body>
-      ${report ? report.outerHTML : "<h1>Reporte Ejecutivo — Casa Junquillar</h1>"}
-      <hr style="margin:24px 0">
-      ${balance ? balance.outerHTML : ""}
-      <script>window.print();<\/script>
-    </body>
-    </html>
-  `;
-  const w = window.open("", "_blank");
-  if (!w) {
-    alert("El navegador bloqueó la ventana emergente. Permite pop-ups para exportar PDF.");
-    return;
-  }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-}
-
-/* ── PLACEHOLDERS ────────────────────────────────────────── */
-function renderVentas() {
-  const el = $("ventas-root");
-  if (el) el.innerHTML = `<div class="card"><div class="card-title">Ventas</div><div class="card-sub">Módulo en preparación.</div></div>`;
-}
-function renderInsumos() {
-  const el = $("insumos-root");
-  if (el) el.innerHTML = `<div class="card"><div class="card-title">Insumos</div><div class="card-sub">Módulo en preparación.</div></div>`;
-}
-function renderConfig() {
-  const el = $("config-root");
-  if (el) el.innerHTML = `<div class="card"><div class="card-title">Configuración</div><div class="card-sub">Ajustes generales del proyecto.</div></div>`;
-}
-
-/* ── NAVEGACIÓN / SETUP ─────────────────────────────────── */
-function updateVisibleSections(ids = []) {
-  document.querySelectorAll(".module-block").forEach(s => s.classList.add("module-hidden"));
-  ids.forEach(id => $(id)?.classList.remove("module-hidden"));
-}
-function setupNavigation() {
-  const buttons = document.querySelectorAll(".nav-btn");
-  const title = $("page-title");
-  const subtitle = $("page-subtitle");
-
-  buttons.forEach(btn => btn.addEventListener("click", () => {
-    buttons.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentView = btn.dataset.view;
-    const view = views[currentView] || views.resumen;
-    if (title) title.textContent = view.title;
-    if (subtitle) subtitle.textContent = view.subtitle;
-    updateVisibleSections(view.visible);
-    docsVisibleLimit = currentView === "gastos" ? 10 : 3;
-    renderAll();
-  }));
-
-  $("btn-ver-reportes")?.addEventListener("click", () => document.querySelector('[data-view="reportes"]')?.click());
-}
-function setupButtons() {
-  $("load-more-btn")?.addEventListener("click", () => { docsVisibleLimit += 20; renderDocs(docsVisibleLimit); });
-  $("btn-aplicar-filtros-gastos")?.addEventListener("click", applyFilters);
-  $("btn-limpiar-filtros-gastos")?.addEventListener("click", clearFilters);
-  $("btn-export-csv")?.addEventListener("click", exportCSV);
-  $("btn-export-excel")?.addEventListener("click", exportCSV);
-  ["filter-text-gastos", "global-search"].forEach(id => $(id)?.addEventListener("input", applyFilters));
-
-  $("modal-overlay")?.addEventListener("click", e => { if (e.target === $("modal-overlay")) closeEditModal(); });
-  $("btn-modal-cancel")?.addEventListener("click", closeEditModal);
-  $("btn-modal-cancel2")?.addEventListener("click", closeEditModal);
-  $("btn-modal-save")?.addEventListener("click", saveEditModal);
-  $("chk-all")?.addEventListener("change", e => toggleSelectAll(e.target));
-  $("btn-bulk-delete")?.addEventListener("click", bulkDelete);
-  $("btn-bulk-cancel")?.addEventListener("click", cancelBulkSelection);
-
-  $("btn-export-pdf")?.addEventListener("click", e => { e.preventDefault(); exportToPDF(); });
-  $("btn-export-excel")?.addEventListener("click", e => { e.preventDefault(); exportToExcel(); });
-  $("btn-ver-detalle")?.addEventListener("click", e => { e.preventDefault(); toggleDetalle(); });
-}
-function renderAll() {
-  renderKPIs();
-  renderAlerts();
-  renderBottomCards();
-  renderDocs(docsVisibleLimit);
-  renderProveedores();
-  renderCaja();
-  renderBalance();
-  renderControlProyecto();
-  renderReportes();
-  renderVentas();
-  renderInsumos();
-  renderConfig();
-}
-function injectReportStyles() {
-  if ($("junqo-report-inline-styles")) return;
-  const style = document.createElement("style");
-  style.id = "junqo-report-inline-styles";
-  style.textContent = `
-    .simple-chart-bars{height:220px;display:flex;gap:14px;align-items:end;padding:18px 8px 8px}
-    .simple-bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:60px}
-    .simple-bars{height:160px;width:100%;display:flex;justify-content:center;align-items:end;gap:4px}
-    .simple-bar{width:18px;border-radius:6px 6px 0 0;display:block}
-    .simple-bar-budget{background:#d1fae5}
-    .simple-bar-real{background:#0f172a}
-    .simple-bar-label{font-size:11px;color:#64748b;text-align:center}
-    .simple-legend{display:flex;gap:16px;justify-content:center;font-size:12px;color:#64748b}
-    .simple-donut{width:150px;height:150px;border-radius:50%;margin:14px auto;background:conic-gradient(#0f766e 0 40%, #059669 40% 70%, #94a3b8 70% 100%);display:flex;align-items:center;justify-content:center}
-    .simple-donut-center{width:92px;height:92px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;font-weight:700;padding:8px}
-    .simple-donut-list{display:flex;flex-direction:column;gap:8px}
-    .simple-donut-list div{display:flex;justify-content:space-between;font-size:13px;border-bottom:1px solid #f1f5f9;padding-bottom:6px}
-    .simple-line-chart{height:220px;display:flex;gap:12px;align-items:end;padding:16px 8px}
-    .simple-line-point{flex:1;height:180px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px}
-    .simple-line-value{width:22px;background:#059669;border-radius:8px 8px 0 0}
-    .simple-line-point span{font-size:11px;color:#64748b}
-    .simple-line-point strong{font-size:10px;color:#0f172a;text-align:center}
-  `;
-  document.head.appendChild(style);
-}
-function initDashboard() {
-  injectReportStyles();
-  setupNavigation();
-  setupFileUpload();
-  setupButtons();
-  updateVisibleSections(views.resumen.visible);
-  loadData();
-}
-
+function initDashboard(){ setupNavigation(); setupFileUpload(); setupButtons(); updateVisibleSections(views.resumen.visible); loadData(); }
 document.addEventListener("DOMContentLoaded", initDashboard);
-
-/* ── FUNCIONES GLOBALES PARA ONCLICK INLINE ───────────────── */
-window.openEditModal = openEditModal;
-window.closeEditModal = closeEditModal;
-window.confirmDelete = confirmDelete;
-window.toggleRowSelect = toggleRowSelect;
-window.toggleSelectAll = toggleSelectAll;
-window.exportToPDF = exportToPDF;
-window.exportToExcel = exportToExcel;
-window.toggleDetalle = toggleDetalle;
-window.exportBalanceCSV = exportBalanceCSV;
