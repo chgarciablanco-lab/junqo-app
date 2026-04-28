@@ -1265,6 +1265,7 @@ function setupNavigation(){
     updateVisibleSections(view.visible);
     docsVisibleLimit=(currentView==="gastos")?10:3;
     renderDocs(docsVisibleLimit);
+    if(currentView==="control-financiero") renderControlFinanciero();
   }));
   $("btn-ver-reportes")?.addEventListener("click",()=>document.querySelector('[data-view="reportes"]')?.click());
 }
@@ -1459,13 +1460,14 @@ function renderControlFinanciero() {
 }
 
 function renderAll(){
-  renderKPIs();renderAlerts();renderBottomCards();
-  renderDocs(docsVisibleLimit);renderProveedores();
-  renderCaja();renderControlProyecto();
-  renderReportes();renderBudgetEditor();
-  renderVentas();renderInsumos();renderConfiguracion();
-  renderDocumentoLog();
-  renderControlFinanciero();
+  const safe = fn => { try{ fn(); }catch(e){ console.error(e); } };
+  safe(renderKPIs);safe(renderAlerts);safe(renderBottomCards);
+  safe(()=>renderDocs(docsVisibleLimit));safe(renderProveedores);
+  safe(renderCaja);safe(renderControlProyecto);
+  safe(renderReportes);safe(renderBudgetEditor);
+  safe(renderVentas);safe(renderInsumos);safe(renderConfiguracion);
+  safe(renderDocumentoLog);
+  safe(renderControlFinanciero);
 }
 
 /* ── EXPORTACIONES ────────────────────────────────────────── */
