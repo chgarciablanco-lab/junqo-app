@@ -97,20 +97,80 @@ async function handleFileUpload(event){
   const{data:up,error:ue}=await window.supabaseClient.storage.from(BUCKET_NAME).upload(path,file,{cacheControl:"3600",upsert:false,contentType:file.type||undefined});
   if(ue){alert(`Error subiendo: ${ue.message}`);event.target.value="";return;}
   const stored=up.path;
+  
 if(isSheet||isCSV){
+if(tipoCarga === "cartola"){
+    const movimientos = rows.map(r => ({
+      fecha: r.fecha,
+      descripcion: r.proveedor || r.observacion || "Movimiento bancario",
+      monto: Math.abs(Number(r.total || r.neto || 0)),
+      tipo: Number(r.total || r.neto || 0) < 0 ? "cargo" : "abono",
+      estado: "pendiente",
+      proyecto: PROJECT_NAME,
+      observacion: stored
+    }));
+
+    let insertados = 0;
+
+    for(let i=0;i<movimientos.length;i+=50){
+      const batch = movimientos.slice(i,i+50);
+
+      const { error } = await window.supabaseClient
+        .from("movimientos_banco")
+        .insert(batch);
+
+      if(error){
+        alert("Error cargando cartola: " + error.message);
+        event.target.value = "";
+        return;
+      }
+
+      insertados += batch.length;
+    }
+
+    alert(`✅ ${insertados} movimientos bancarios cargados`);
+    event.target.value = "";
+
+    await loadData();
+
+    currentView = "conciliacion";
+
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.querySelector('.nav-btn[data-view="conciliacion"]')?.classList.add("active");
+
+    const view = views.conciliacion;
+
+    document.getElementById("page-title").textContent = view.title;
+    document.getElementById("page-subtitle").textContent = view.subtitle;
+
+    updateVisibleSections(view.visible);
+
+    await cargarConciliacion();
+
+    return;
+  }
+
   rows.forEach(r=>r.foto_path=stored);
+
   let ins=0;
+
   for(let i=0;i<rows.length;i+=50){
     const b=rows.slice(i,i+50);
-    const{error}=await window.supabaseClient.from("gastos_junquillar_app").insert(b);
+
+    const{error}=await window.supabaseClient
+      .from("gastos_junquillar_app")
+      .insert(b);
+
     if(error){
       alert(`Insertados ${ins}, luego error: ${error.message}`);
       event.target.value="";
       await loadData();
       return;
     }
+
     ins+=b.length;
   }
+
   alert(`✅ ${ins} registros importados.`);
   event.target.value="";
   await loadData();
