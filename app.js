@@ -84,45 +84,65 @@ function parseMontoBanco(v){
 function sheetToMovimientosBanco(rows){
   if(!rows || rows.length < 2) return [];
 
-  const headerIndex = rows.findIndex(r =>
-    r.some(c => String(c || "").toLowerCase().includes("fecha")) &&
-    r.some(c => String(c || "").toLowerCase().includes("descrip"))
-  );
+  const limpiar = v => String(v || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g,"")
+    .trim();
+
+  const headerIndex = rows.findIndex(r => {
+    const txt = r.map(limpiar).join(" ");
+    return txt.includes("fecha") && (
+      txt.includes("descripcion") ||
+      txt.includes("glosa") ||
+      txt.includes("detalle") ||
+      txt.includes("cargo") ||
+      txt.includes("abono") ||
+      txt.includes("monto")
+    );
+  });
 
   const hi = headerIndex >= 0 ? headerIndex : 0;
-  const headers = rows[hi].map(h =>
-    String(h || "")
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g,"")
-      .trim()
+  const headers = rows[hi].map(limpiar);
+
+  const colFecha = headers.findIndex(h =>
+    h.includes("fecha") || h.includes("fec")
   );
 
-  const colFecha = headers.findIndex(h => h.includes("fecha"));
   const colDesc = headers.findIndex(h =>
     h.includes("descripcion") ||
-    h.includes("detalle") ||
     h.includes("glosa") ||
-    h.includes("movimiento")
+    h.includes("detalle") ||
+    h.includes("movimiento") ||
+    h.includes("transaccion") ||
+    h.includes("concepto")
   );
 
   const colCargo = headers.findIndex(h =>
     h.includes("cargo") ||
     h.includes("egreso") ||
-    h.includes("debe")
+    h.includes("debe") ||
+    h.includes("retiro")
   );
 
   const colAbono = headers.findIndex(h =>
     h.includes("abono") ||
     h.includes("ingreso") ||
-    h.includes("haber")
+    h.includes("haber") ||
+    h.includes("deposito")
   );
 
   const colMonto = headers.findIndex(h =>
     h.includes("monto") ||
     h.includes("importe") ||
-    h.includes("valor")
+    h.includes("valor") ||
+    h.includes("total")
   );
+
+  if(colFecha < 0){
+    console.log("Columnas detectadas:", headers);
+    return [];
+  }
 
   const movimientos = [];
 
@@ -131,24 +151,31 @@ function sheetToMovimientosBanco(rows){
     if(!row || !row.some(c => String(c || "").trim())) continue;
 
     const fecha = toDateISO(row[colFecha]);
-    const descripcion = String(row[colDesc] || "Movimiento bancario").trim();
+    if(!fecha) continue;
+
+    const descripcion = colDesc >= 0
+      ? String(row[colDesc] || "Movimiento bancario").trim()
+      : "Movimiento bancario";
 
     let monto = 0;
     let tipo = "cargo";
 
-    if(colCargo >= 0 && parseMontoBanco(row[colCargo]) > 0){
-      monto = parseMontoBanco(row[colCargo]);
+    const cargo = colCargo >= 0 ? parseMontoBanco(row[colCargo]) : 0;
+    const abono = colAbono >= 0 ? parseMontoBanco(row[colAbono]) : 0;
+    const montoUnico = colMonto >= 0 ? parseMontoBanco(row[colMonto]) : 0;
+
+    if(cargo > 0){
+      monto = cargo;
       tipo = "cargo";
-    } else if(colAbono >= 0 && parseMontoBanco(row[colAbono]) > 0){
-      monto = parseMontoBanco(row[colAbono]);
+    } else if(abono > 0){
+      monto = abono;
       tipo = "abono";
-    } else if(colMonto >= 0){
-      const raw = parseMontoBanco(row[colMonto]);
-      monto = Math.abs(raw);
-      tipo = raw < 0 ? "cargo" : "abono";
+    } else if(montoUnico !== 0){
+      monto = Math.abs(montoUnico);
+      tipo = montoUnico < 0 ? "cargo" : "abono";
     }
 
-    if(!fecha || !monto) continue;
+    if(!monto) continue;
 
     movimientos.push({
       fecha,
