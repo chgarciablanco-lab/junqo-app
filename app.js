@@ -22,12 +22,17 @@ let authUser = null;
 let dashboardStarted = false;
 
 const views = {
+  conciliacion: {
+  title: "Conciliación bancaria",
+  subtitle: "Cruce automático entre cartola y gastos",
+  visible: ["section-conciliacion"]
+},
   resumen:     { title:"Resumen",            subtitle:"Vista ejecutiva y control del proyecto",               visible:["section-kpis","section-alerts","section-control"] },
   gastos:      { title:"Gastos",             subtitle:"Registro y control de egresos del proyecto",          visible:["section-filtro-solo","section-docs"] },
   documentos:  { title:"Documentos",         subtitle:"Carga de facturas, boletas y respaldo documental",    visible:["section-upload-only"] },
   proveedores: { title:"Proveedores",        subtitle:"Análisis por proveedor, documentos y concentración",  visible:["section-proveedores"] },
   caja:        { title:"Caja e IVA",         subtitle:"Crédito fiscal, documentos y detalle mensual",        visible:["section-caja"] },
-  "control-financiero": { title:"Control Financiero",  subtitle:"Flujo financiero mensual del proyecto — sin IVA",            visible:["section-control-financiero"] },
+  control-financiero: { title:"Control Financiero",  subtitle:"Flujo financiero mensual del proyecto — sin IVA",            visible:["section-control-financiero"] },
   reportes:             { title:"Reportes",             subtitle:"Análisis resumido por categoría y mes",                     visible:["section-reportes"] },
   ventas:       { title:"Ventas",            subtitle:"Ingresos, cotizaciones y contactos del proyecto",     visible:["section-ventas"] },
   insumos:      { title:"Insumos",           subtitle:"Control de materiales y stock en obra",               visible:["section-insumos"] },
@@ -81,6 +86,7 @@ async function parseCSV(file,fp){ return new Promise(res=>{ const r=new FileRead
 
 /* ── FILE UPLOAD ──────────────────────────────────────────── */
 async function handleFileUpload(event){
+  const tipoCarga = document.getElementById("upload-doc-type")?.value || "gasto";
   const file=event.target.files?.[0]; if(!file)return;
   const ext=getFileExtension(file.name);
   if(!ALLOWED_FILE_EXTENSIONS.includes(ext)){alert("Formato no permitido.");event.target.value="";return;}
@@ -94,12 +100,25 @@ async function handleFileUpload(event){
   const{data:up,error:ue}=await window.supabaseClient.storage.from(BUCKET_NAME).upload(path,file,{cacheControl:"3600",upsert:false,contentType:file.type||undefined});
   if(ue){alert(`Error subiendo: ${ue.message}`);event.target.value="";return;}
   const stored=up.path;
-  if(isSheet||isCSV){
-    rows.forEach(r=>r.foto_path=stored);
-    let ins=0;
-    for(let i=0;i<rows.length;i+=50){const b=rows.slice(i,i+50);const{error}=await window.supabaseClient.from("gastos_junquillar_app").insert(b);if(error){alert(`Insertados ${ins}, luego error: ${error.message}`);event.target.value="";await loadData();return;}ins+=b.length;}
-    alert(`✅ ${ins} registros importados.`);event.target.value="";await loadData();return;
+if(isSheet||isCSV){
+  rows.forEach(r=>r.foto_path=stored);
+  let ins=0;
+  for(let i=0;i<rows.length;i+=50){
+    const b=rows.slice(i,i+50);
+    const{error}=await window.supabaseClient.from("gastos_junquillar_app").insert(b);
+    if(error){
+      alert(`Insertados ${ins}, luego error: ${error.message}`);
+      event.target.value="";
+      await loadData();
+      return;
+    }
+    ins+=b.length;
   }
+  alert(`✅ ${ins} registros importados.`);
+  event.target.value="";
+  await loadData();
+  return;
+}
   const isImage = (file.type && file.type.startsWith("image/")) || ["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext);
   const{data:inserted,error:ie}=await window.supabaseClient
     .from("gastos_junquillar_app")
@@ -1289,6 +1308,7 @@ function setupNavigation(){
     docsVisibleLimit=(currentView==="gastos")?10:3;
     renderDocs(docsVisibleLimit);
     if(currentView==="control-financiero") renderControlFinanciero();
+    if(currentView==="conciliacion") cargarConciliacion();
   }));
   $("btn-ver-reportes")?.addEventListener("click",()=>document.querySelector('[data-view="reportes"]')?.click());
 }
@@ -2524,5 +2544,63 @@ window.toggleDetalle = function () {
 };
 
 
+async function cargarConciliacion(){
 
+  const root = document.getElementById("conciliacion-root");
+  if(!root) return;
+
+  const { data: movimientos } = await window.supabaseClient
+    .from("movimientos_banco")
+    .select("*")
+    .order("fecha", { ascending: false });
+
+  if(!movimientos || !movimientos.length){
+    root.innerHTML = "<div class='card'>No hay movimientos bancarios</div>";
+    return;
+  }
+
+  // 🔥 MATCH SIMPLE
+  const sugeridos = movimientos.map(m => {
+
+    const match = gastos.find(g => {
+      const mismoMonto = Number(g.total) === Math.abs(Number(m.monto));
+
+      const fechaBanco = new Date(m.fecha);
+      const fechaGasto = new Date(g.fecha);
+
+      const diffDias = Math.abs((fechaBanco - fechaGasto) / (1000*60*60*24));
+
+      return mismoMonto && diffDias <= 3;
+    });
+
+    return {
+      ...m,
+      match
+    };
+  });
+
+  root.innerHTML = `
+    <div class="card">
+      <div class="card-title">Conciliación bancaria</div>
+      <div class="table-wrap" style="margin-top:12px">
+        <div class="table-head">
+          <div>Fecha</div>
+          <div>Descripción</div>
+          <div>Monto</div>
+          <div>Match</div>
+        </div>
+        ${
+          sugeridos.map(m => `
+            <div class="table-row">
+              <div>${m.fecha}</div>
+              <div>${m.descripcion}</div>
+              <div>${formatoCLP(m.monto)}</div>
+              <div>${m.match ? "✅ Encontrado" : "❌ No encontrado"}</div>
+            </div>
+          `).join("")
+        }
+      </div>
+    </div>
+  `;
+}
 
