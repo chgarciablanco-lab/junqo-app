@@ -32,7 +32,7 @@ const views = {
   documentos:  { title:"Documentos",         subtitle:"Carga de facturas, boletas y respaldo documental",    visible:["section-upload-only"] },
   proveedores: { title:"Proveedores",        subtitle:"Análisis por proveedor, documentos y concentración",  visible:["section-proveedores"] },
   caja:        { title:"Caja e IVA",         subtitle:"Crédito fiscal, documentos y detalle mensual",        visible:["section-caja"] },
-  control-financiero: { title:"Control Financiero",  subtitle:"Flujo financiero mensual del proyecto — sin IVA",            visible:["section-control-financiero"] },
+  "control-financiero": { title:"Control Financiero",  subtitle:"Flujo financiero mensual del proyecto — sin IVA",            visible:["section-control-financiero"] },
   reportes:             { title:"Reportes",             subtitle:"Análisis resumido por categoría y mes",                     visible:["section-reportes"] },
   ventas:       { title:"Ventas",            subtitle:"Ingresos, cotizaciones y contactos del proyecto",     visible:["section-ventas"] },
   insumos:      { title:"Insumos",           subtitle:"Control de materiales y stock en obra",               visible:["section-insumos"] },
