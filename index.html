@@ -73,13 +73,20 @@
         <div class="card upload-card">
           <div class="card-title">Adjuntar factura, boleta o planilla</div>
           <div class="card-sub">Puedes adjuntar una foto, PDF, Excel o CSV</div>
+          <div class="upload-type-row">
+  <label class="filter-label" for="upload-doc-type">Tipo de carga</label>
+  <select class="filter-select" id="upload-doc-type">
+    <option value="gasto">Documento de gasto / respaldo</option>
+    <option value="cartola">Cartola bancaria</option>
+  </select>
+</div>
           <div class="dropzone" id="dropzone">
             <div class="dropzone-icon">☁️</div>
             <div class="dropzone-text">Arrastra tu archivo aquí</div>
             <div class="dropzone-sub">o <span class="dropzone-link" id="select-file-link">selecciona un archivo</span></div>
             <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.pdf,.xls,.xlsx,.csv" hidden/>
           </div>
-          <div class="dropzone-formats">Formatos: JPG, PNG, PDF, Excel y CSV (máx. 10 MB)</div>
+         <div class="dropzone-formats">Formatos: JPG, PNG, PDF, Excel y CSV (máx. 10 MB). Para cartola usa Excel o CSV.</div>
           <div class="upload-btns">
             <button class="upload-btn-primary" id="btn-adjuntar">📎 &nbsp;Adjuntar archivo</button>
             <button class="upload-btn-secondary" id="btn-foto">📷 &nbsp;Sacar foto</button>
