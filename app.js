@@ -255,15 +255,10 @@ async function handleFileUpload(event){
   
 if(isSheet||isCSV){
 if(tipoCarga === "cartola"){
-    const movimientos = rows.map(r => ({
-      fecha: r.fecha,
-      descripcion: r.proveedor || r.observacion || "Movimiento bancario",
-      monto: Math.abs(Number(r.total || r.neto || 0)),
-      tipo: Number(r.total || r.neto || 0) < 0 ? "cargo" : "abono",
-      estado: "pendiente",
-      proyecto: PROJECT_NAME,
-      observacion: stored
-    }));
+const movimientos = rows.map(r => ({
+  ...r,
+  observacion: stored
+}));
 
     let insertados = 0;
 
