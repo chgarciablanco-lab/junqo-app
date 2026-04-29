@@ -69,6 +69,143 @@ function getFileExtension(f){ return String(f||"").split(".").pop().toLowerCase(
 function sanitizeFileName(f){ return String(f||"archivo").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9._-]/g,"_"); }
 function getFileGroup(ext){ if(["jpg","jpeg","png"].includes(ext)) return"imagenes"; if(["xls","xlsx","csv"].includes(ext)) return"planillas"; return"pdf"; }
 
+function parseMontoBanco(v){
+  if(v===null || v===undefined || v==="") return 0;
+  if(typeof v==="number") return v;
+  return Number(
+    String(v)
+      .replace(/\$/g,"")
+      .replace(/\./g,"")
+      .replace(",",".")
+      .replace(/[^0-9.-]/g,"")
+  ) || 0;
+}
+
+function sheetToMovimientosBanco(rows){
+  if(!rows || rows.length < 2) return [];
+
+  const headerIndex = rows.findIndex(r =>
+    r.some(c => String(c || "").toLowerCase().includes("fecha")) &&
+    r.some(c => String(c || "").toLowerCase().includes("descrip"))
+  );
+
+  const hi = headerIndex >= 0 ? headerIndex : 0;
+  const headers = rows[hi].map(h =>
+    String(h || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g,"")
+      .trim()
+  );
+
+  const colFecha = headers.findIndex(h => h.includes("fecha"));
+  const colDesc = headers.findIndex(h =>
+    h.includes("descripcion") ||
+    h.includes("detalle") ||
+    h.includes("glosa") ||
+    h.includes("movimiento")
+  );
+
+  const colCargo = headers.findIndex(h =>
+    h.includes("cargo") ||
+    h.includes("egreso") ||
+    h.includes("debe")
+  );
+
+  const colAbono = headers.findIndex(h =>
+    h.includes("abono") ||
+    h.includes("ingreso") ||
+    h.includes("haber")
+  );
+
+  const colMonto = headers.findIndex(h =>
+    h.includes("monto") ||
+    h.includes("importe") ||
+    h.includes("valor")
+  );
+
+  const movimientos = [];
+
+  for(let i = hi + 1; i < rows.length; i++){
+    const row = rows[i];
+    if(!row || !row.some(c => String(c || "").trim())) continue;
+
+    const fecha = toDateISO(row[colFecha]);
+    const descripcion = String(row[colDesc] || "Movimiento bancario").trim();
+
+    let monto = 0;
+    let tipo = "cargo";
+
+    if(colCargo >= 0 && parseMontoBanco(row[colCargo]) > 0){
+      monto = parseMontoBanco(row[colCargo]);
+      tipo = "cargo";
+    } else if(colAbono >= 0 && parseMontoBanco(row[colAbono]) > 0){
+      monto = parseMontoBanco(row[colAbono]);
+      tipo = "abono";
+    } else if(colMonto >= 0){
+      const raw = parseMontoBanco(row[colMonto]);
+      monto = Math.abs(raw);
+      tipo = raw < 0 ? "cargo" : "abono";
+    }
+
+    if(!fecha || !monto) continue;
+
+    movimientos.push({
+      fecha,
+      descripcion,
+      monto,
+      tipo,
+      estado: "pendiente",
+      proyecto: PROJECT_NAME
+    });
+  }
+
+  return movimientos;
+}
+
+async function parseSpreadsheetBanco(file){
+  return new Promise(res=>{
+    const r = new FileReader();
+    r.onload = e => {
+      try{
+        const d = new Uint8Array(e.target.result);
+        const wb = window.XLSX.read(d,{type:"array",cellDates:false});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = window.XLSX.utils.sheet_to_json(ws,{header:1,defval:"",raw:true});
+        res(sheetToMovimientosBanco(rows));
+      }catch(err){
+        console.error(err);
+        res([]);
+      }
+    };
+    r.onerror = () => res([]);
+    r.readAsArrayBuffer(file);
+  });
+}
+
+async function parseCSVBanco(file){
+  return new Promise(res=>{
+    const r = new FileReader();
+    r.onload = e => {
+      try{
+        const text = e.target.result;
+        const sep = text.includes(";") ? ";" : ",";
+        const rows = text
+          .split(/\r?\n/)
+          .filter(l => l.trim())
+          .map(l => l.split(sep).map(c => c.replace(/^"|"$/g,"").trim()));
+
+        res(sheetToMovimientosBanco(rows));
+      }catch(err){
+        console.error(err);
+        res([]);
+      }
+    };
+    r.onerror = () => res([]);
+    r.readAsText(file,"UTF-8");
+  });
+}
+
 /* ── EXCEL PARSER ─────────────────────────────────────────── */
 const EXACT_HEADERS={0:"fecha",1:"proveedor",2:"rut",3:"tipo_documento",4:"numero_documento",5:"neto",6:"iva",7:"total",8:"categoria",9:"metodo_pago",10:"proyecto"};
 const HEADER_ALIASES={fecha:["fecha","date"],proveedor:["proveedor","supplier","nombre","razón social","razon social"],rut:["rut","r.u.t","r.u.t."],tipo_documento:["tipo","tipo documento","tipo doc","type","documento"],numero_documento:["nº documento","n° documento","numero documento","folio","nro","n°","doc"],neto:["neto","monto neto","base neta","costo neto","net","base"],iva:["iva","i.v.a","i.v.a.","tax","impuesto"],total:["total","total doc","monto total","total bruto"],categoria:["categoría","categoria","category","partida","etapa"],metodo_pago:["método de pago","metodo de pago","método pago","forma pago","pago","payment"],proyecto:["proyecto","project"]};
@@ -92,7 +229,25 @@ async function handleFileUpload(event){
   if(["xls","xlsx","csv"].includes(ext)&&typeof window.XLSX==="undefined"){alert("Librería Excel no cargada.");event.target.value="";return;}
   const isSheet=["xls","xlsx"].includes(ext),isCSV=ext==="csv";
   let rows=[];
-  if(isSheet||isCSV){ rows=isCSV?await parseCSV(file,null):await parseSpreadsheet(file,null); if(!rows.length){alert("No se encontraron filas reconocibles.");event.target.value="";return;} }
+  if(isSheet||isCSV){
+  if(tipoCarga === "cartola"){
+    rows = isCSV ? await parseCSVBanco(file) : await parseSpreadsheetBanco(file);
+
+    if(!rows.length){
+      alert("No se pudieron leer movimientos. Revisa que la cartola tenga columnas como Fecha, Descripción, Cargo, Abono o Monto.");
+      event.target.value="";
+      return;
+    }
+  } else {
+    rows = isCSV ? await parseCSV(file,null) : await parseSpreadsheet(file,null);
+
+    if(!rows.length){
+      alert("No se encontraron filas reconocibles.");
+      event.target.value="";
+      return;
+    }
+  }
+}
   const safeName=sanitizeFileName(file.name),group=getFileGroup(ext),path=`junquillar/${group}/${Date.now()}-${safeName}`;
   const{data:up,error:ue}=await window.supabaseClient.storage.from(BUCKET_NAME).upload(path,file,{cacheControl:"3600",upsert:false,contentType:file.type||undefined});
   if(ue){alert(`Error subiendo: ${ue.message}`);event.target.value="";return;}
