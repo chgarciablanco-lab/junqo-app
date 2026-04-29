@@ -90,92 +90,108 @@ function sheetToMovimientosBanco(rows){
     .replace(/[\u0300-\u036f]/g,"")
     .trim();
 
-  const headerIndex = rows.findIndex(r => {
-    const txt = r.map(limpiar).join(" ");
-    return txt.includes("fecha") && (
-      txt.includes("descripcion") ||
-      txt.includes("glosa") ||
-      txt.includes("detalle") ||
-      txt.includes("cargo") ||
-      txt.includes("abono") ||
-      txt.includes("monto")
-    );
-  });
+  // Buscar fila de headers (puede haber títulos o filas vacías arriba)
+  let headerIndex = -1;
+  for(let i = 0; i < Math.min(15, rows.length); i++){
+    const txt = rows[i].map(limpiar).join(" ");
+    const tieneFecha = txt.includes("fecha") || txt.includes("fec");
+    const tieneMonto = txt.includes("cargo") || txt.includes("abono") ||
+                       txt.includes("monto") || txt.includes("importe") ||
+                       txt.includes("egreso") || txt.includes("ingreso") ||
+                       txt.includes("haber") || txt.includes("debe");
+    if(tieneFecha && tieneMonto){ headerIndex = i; break; }
+  }
 
   const hi = headerIndex >= 0 ? headerIndex : 0;
   const headers = rows[hi].map(limpiar);
 
+  console.log("[BancoParser] Fila headers:", hi, "| Columnas:", headers);
+
   const colFecha = headers.findIndex(h =>
-    h.includes("fecha") || h.includes("fec")
+    h.includes("fecha") || h === "fec" || h.includes("fecha op") || h.includes("fecha mov")
   );
-
   const colDesc = headers.findIndex(h =>
-    h.includes("descripcion") ||
-    h.includes("glosa") ||
-    h.includes("detalle") ||
-    h.includes("movimiento") ||
-    h.includes("transaccion") ||
-    h.includes("concepto")
+    h.includes("descripcion") || h.includes("glosa") || h.includes("detalle") ||
+    h.includes("movimiento") || h.includes("transaccion") || h.includes("concepto") ||
+    h.includes("narracion") || h.includes("texto") || h.includes("referencia")
   );
-
   const colCargo = headers.findIndex(h =>
-    h.includes("cargo") ||
-    h.includes("egreso") ||
-    h.includes("debe") ||
-    h.includes("retiro")
+    h.includes("cargo") || h.includes("egreso") || h.includes("debe") ||
+    h.includes("retiro") || h.includes("debito")
   );
-
   const colAbono = headers.findIndex(h =>
-    h.includes("abono") ||
-    h.includes("ingreso") ||
-    h.includes("haber") ||
-    h.includes("deposito")
+    h.includes("abono") || h.includes("ingreso") || h.includes("haber") ||
+    h.includes("deposito") || h.includes("credito")
+  );
+  const colMonto = headers.findIndex(h =>
+    (h.includes("monto") || h.includes("importe") || h.includes("valor") || h === "total") &&
+    !h.includes("cargo") && !h.includes("abono")
   );
 
-  const colMonto = headers.findIndex(h =>
-    h.includes("monto") ||
-    h.includes("importe") ||
-    h.includes("valor") ||
-    h.includes("total")
-  );
+  console.log("[BancoParser] Columnas detectadas →", {
+    fecha:       colFecha  >= 0 ? `[${colFecha}] "${rows[hi][colFecha]}"` : "❌ NO ENCONTRADA",
+    descripcion: colDesc   >= 0 ? `[${colDesc}] "${rows[hi][colDesc]}"` : "❌ NO ENCONTRADA",
+    cargo:       colCargo  >= 0 ? `[${colCargo}] "${rows[hi][colCargo]}"` : "— no aplica",
+    abono:       colAbono  >= 0 ? `[${colAbono}] "${rows[hi][colAbono]}"` : "— no aplica",
+    monto:       colMonto  >= 0 ? `[${colMonto}] "${rows[hi][colMonto]}"` : "— no aplica",
+  });
 
   if(colFecha < 0){
-    console.log("Columnas detectadas:", headers);
+    console.error("[BancoParser] ❌ No se detectó columna FECHA. Encabezados encontrados:", headers);
     return [];
   }
 
   const movimientos = [];
+  let omitidas = 0;
+  const dataRows = rows.slice(hi + 1);
 
-  for(let i = hi + 1; i < rows.length; i++){
-    const row = rows[i];
+  for(let i = 0; i < dataRows.length; i++){
+    const row = dataRows[i];
     if(!row || !row.some(c => String(c || "").trim())) continue;
 
     const fecha = toDateISO(row[colFecha]);
-    if(!fecha) continue;
+    if(!fecha){
+      omitidas++;
+      continue;
+    }
 
     const descripcion = colDesc >= 0
-      ? String(row[colDesc] || "Movimiento bancario").trim()
+      ? String(row[colDesc] || "Movimiento bancario").trim() || "Movimiento bancario"
       : "Movimiento bancario";
 
     let monto = 0;
     let tipo = "cargo";
 
-    const cargo = colCargo >= 0 ? parseMontoBanco(row[colCargo]) : 0;
-    const abono = colAbono >= 0 ? parseMontoBanco(row[colAbono]) : 0;
-    const montoUnico = colMonto >= 0 ? parseMontoBanco(row[colMonto]) : 0;
+    const parsear = v => {
+      if(v === null || v === undefined || v === "") return 0;
+      if(typeof v === "number") return v;
+      const s = String(v).replace(/[$\s]/g,"");
+      const esNeg = s.startsWith("-") || (s.startsWith("(") && s.endsWith(")"));
+      let clean = s.replace(/[()]/g,"").replace(/^-/,"");
+      // Formato chileno: puntos = miles, coma = decimal
+      if(clean.includes(",")) clean = clean.replace(/\./g,"").replace(",",".");
+      else clean = clean.replace(/\./g,"");
+      const n = parseFloat(clean);
+      return isNaN(n) ? 0 : (esNeg ? -Math.abs(n) : n);
+    };
 
-    if(cargo > 0){
-      monto = cargo;
-      tipo = "cargo";
-    } else if(abono > 0){
-      monto = abono;
-      tipo = "abono";
-    } else if(montoUnico !== 0){
-      monto = Math.abs(montoUnico);
-      tipo = montoUnico < 0 ? "cargo" : "abono";
+    if(colCargo >= 0 && colAbono >= 0){
+      const cargo = parsear(row[colCargo]);
+      const abono = parsear(row[colAbono]);
+      if(Math.abs(cargo) > 0){ monto = Math.abs(cargo); tipo = "cargo"; }
+      else if(Math.abs(abono) > 0){ monto = Math.abs(abono); tipo = "abono"; }
+    } else if(colMonto >= 0){
+      const val = parsear(row[colMonto]);
+      if(val !== 0){ monto = Math.abs(val); tipo = val < 0 ? "cargo" : "abono"; }
+    } else if(colCargo >= 0){
+      const val = parsear(row[colCargo]);
+      if(Math.abs(val) > 0){ monto = Math.abs(val); tipo = "cargo"; }
+    } else if(colAbono >= 0){
+      const val = parsear(row[colAbono]);
+      if(Math.abs(val) > 0){ monto = Math.abs(val); tipo = "abono"; }
     }
 
-    if(!monto) continue;
+    if(!monto){ omitidas++; continue; }
 
     movimientos.push({
       fecha,
@@ -187,13 +203,64 @@ function sheetToMovimientosBanco(rows){
     });
   }
 
+  console.log(`[BancoParser] ✅ ${movimientos.length} movimientos válidos | ${omitidas} filas omitidas de ${dataRows.length} totales`);
   return movimientos;
 }
 
-async function parseSpreadsheetBanco(file){
-  return new Promise(res=>{
+async function parseCSVBanco(file){
+  const leerComo = enc => new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload = e => {
+    r.onload = e => res(e.target.result);
+    r.onerror = () => rej(new Error("Error leyendo archivo"));
+    r.readAsText(file, enc);
+  });
+
+  console.log(`[BancoParser] Leyendo CSV: "${file.name}"`);
+
+  let text;
+  try {
+    text = await leerComo("UTF-8");
+    // Si hay caracteres de reemplazo, intentar latin-1 (cartolas antiguas)
+    if(text.includes("�")){
+      console.warn("[BancoParser] UTF-8 con errores, reintentando con ISO-8859-1...");
+      text = await leerComo("ISO-8859-1");
+    }
+  } catch(err) {
+    console.error("[BancoParser] Error leyendo CSV:", err);
+    return [];
+  }
+
+  try{
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if(!lines.length){ console.warn("[BancoParser] CSV vacío."); return []; }
+
+    // Detectar separador: ; o ,
+    const sep = lines[0].split(";").length > lines[0].split(",").length ? ";" : ",";
+    console.log(`[BancoParser] Separador detectado: "${sep}" | Líneas: ${lines.length}`);
+
+    const rows = lines.map(l => {
+      // Respetar campos entre comillas
+      const result = [];
+      let campo = "", enComillas = false;
+      for(let i = 0; i < l.length; i++){
+        const c = l[i];
+        if(c === '"'){
+          if(enComillas && l[i+1] === '"'){ campo += '"'; i++; }
+          else enComillas = !enComillas;
+        } else if(c === sep && !enComillas){
+          result.push(campo.trim()); campo = "";
+        } else { campo += c; }
+      }
+      result.push(campo.trim());
+      return result;
+    });
+
+    return sheetToMovimientosBanco(rows);
+  }catch(err){
+    console.error("[BancoParser] Error procesando CSV:", err);
+    return [];
+  }
+}
       try{
         const d = new Uint8Array(e.target.result);
         const wb = window.XLSX.read(d,{type:"array",cellDates:false});
@@ -2779,6 +2846,116 @@ window.toggleDetalle = function () {
 
 
 async function cargarConciliacion(){
+  const root = document.getElementById("conciliacion-root");
+  if(!root) return;
+
+  root.innerHTML = `<div class="card" style="padding:24px;text-align:center;color:var(--muted)">Cargando movimientos...</div>`;
+
+  const { data: movimientos, error } = await window.supabaseClient
+    .from("movimientos_banco")
+    .select("*")
+    .order("fecha", { ascending: false });
+
+  if(error){
+    console.error("[Conciliacion] Error:", error);
+    root.innerHTML = `<div class="card"><div class="card-title">Error al cargar</div><div class="card-sub">${error.message}</div></div>`;
+    return;
+  }
+
+  if(!movimientos || !movimientos.length){
+    root.innerHTML = `<div class="card">
+      <div class="card-title">Conciliación bancaria</div>
+      <div class="card-sub" style="margin-top:8px">No hay movimientos bancarios cargados.</div>
+      <div style="margin-top:16px;color:var(--muted);font-size:13px">
+        Ve a <strong>Documentos</strong>, selecciona tipo <strong>"Cartola bancaria"</strong> y sube tu archivo Excel o CSV.
+      </div>
+    </div>`;
+    return;
+  }
+
+  // Match: mismo monto total (±1 peso) y fecha dentro de 5 días
+  const sugeridos = movimientos.map(m => {
+    const montoM = Math.abs(Number(m.monto));
+    const fechaM = new Date(m.fecha);
+
+    const match = gastos.find(g => {
+      const montoG = Math.abs(Number(g.total));
+      const diff = Math.abs(montoM - montoG);
+      if(diff > 1) return false;
+      const fechaG = new Date(g.fecha);
+      const diffDias = Math.abs((fechaM - fechaG) / (1000*60*60*24));
+      return diffDias <= 5;
+    });
+
+    return { ...m, match };
+  });
+
+  const total     = sugeridos.length;
+  const matchados = sugeridos.filter(m => m.match).length;
+  const cargos    = sugeridos.filter(m => m.tipo === "cargo").reduce((a,m)=>a+Math.abs(Number(m.monto)),0);
+  const abonos    = sugeridos.filter(m => m.tipo === "abono").reduce((a,m)=>a+Math.abs(Number(m.monto)),0);
+
+  root.innerHTML = `
+    <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi-card">
+        <div class="kpi-title">Total movimientos</div>
+        <div class="kpi-value">${total}</div>
+        <div class="kpi-footer">En la cartola</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Conciliados</div>
+        <div class="kpi-value" style="color:var(--green)">${matchados}</div>
+        <div class="kpi-footer">${total ? Math.round(matchados/total*100) : 0}% del total</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Sin cruzar</div>
+        <div class="kpi-value" style="color:var(--red)">${total - matchados}</div>
+        <div class="kpi-footer">Requieren revisión</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Cargos / Abonos</div>
+        <div class="kpi-value" style="font-size:16px">${formatoCLP(cargos)} / ${formatoCLP(abonos)}</div>
+        <div class="kpi-footer">Egresos e ingresos</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header-row">
+        <div>
+          <div class="card-title">Movimientos bancarios</div>
+          <div class="card-sub">${total} registros importados desde cartola</div>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <div class="table-head" style="grid-template-columns:110px 1fr 130px 90px 160px">
+          <div>Fecha</div>
+          <div>Descripción</div>
+          <div style="text-align:right">Monto</div>
+          <div>Tipo</div>
+          <div>Conciliación</div>
+        </div>
+        <div>
+        ${sugeridos.map(m => {
+          const esAbono = m.tipo === "abono";
+          const color = esAbono ? "var(--green)" : "var(--red)";
+          const tipoLabel = esAbono
+            ? `<span class="jv-badge" style="background:var(--green-soft);color:var(--green)">Abono</span>`
+            : `<span class="jv-badge" style="background:var(--red-soft);color:var(--red)">Cargo</span>`;
+          const matchLabel = m.match
+            ? `<span class="jv-badge" style="background:var(--green-soft);color:var(--green)">✅ ${m.match.proveedor || "Gasto encontrado"}</span>`
+            : `<span class="jv-badge" style="background:#fef3c7;color:#d97706">⏳ Pendiente</span>`;
+          return `<div class="table-row" style="grid-template-columns:110px 1fr 130px 90px 160px">
+            <div style="font-size:12px">${normalizarFecha(m.fecha)}</div>
+            <div class="doc-name" style="font-size:12px">${m.descripcion || "—"}</div>
+            <div style="text-align:right;font-weight:600;color:${color}">${formatoCLP(m.monto)}</div>
+            <div>${tipoLabel}</div>
+            <div>${matchLabel}</div>
+          </div>`;
+        }).join("")}
+        </div>
+      </div>
+    </div>`;
+}
 
   const root = document.getElementById("conciliacion-root");
   if(!root) return;
