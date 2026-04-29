@@ -22,12 +22,9 @@ let authUser = null;
 let dashboardStarted = false;
 
 const views = {
-  conciliacion: {
-  title: "Conciliación bancaria",
-  subtitle: "Cruce automático entre cartola y gastos",
-  visible: ["section-conciliacion"]
-},
-  resumen:     { title:"Resumen",            subtitle:"Vista ejecutiva y control del proyecto",               visible:["section-kpis","section-alerts","section-control"] },
+  
+  resumen:     { title:"Resumen",            subtitle:"Vista ejecutiva y control del proyecto",              visible:["section-kpis","section-alerts","section-control"] },
+  conciliacion: {title: "Conciliación bancaria", subtitle: "Cruce automático entre cartola y gastos",        visible: ["section-conciliacion"] },
   gastos:      { title:"Gastos",             subtitle:"Registro y control de egresos del proyecto",          visible:["section-filtro-solo","section-docs"] },
   documentos:  { title:"Documentos",         subtitle:"Carga de facturas, boletas y respaldo documental",    visible:["section-upload-only"] },
   proveedores: { title:"Proveedores",        subtitle:"Análisis por proveedor, documentos y concentración",  visible:["section-proveedores"] },
