@@ -924,11 +924,26 @@ if(typeof selectedIds!==“undefined”&&selectedIds?.clear)selectedIds.clear();
 renderLoginScreen();
 }
 async function initAuth(){
-if(typeof window.supabaseClient===“undefined”||!window.supabaseClient.auth){alert(“Supabase Auth no está disponible.”);return;}
+// Retry hasta 20 veces (4 segundos) esperando que supabaseClient cargue
+let intentos = 0;
+while((typeof window.supabaseClient===“undefined”||!window.supabaseClient.auth) && intentos < 20){
+await new Promise(r=>setTimeout(r,200));
+intentos++;
+}
+if(typeof window.supabaseClient===“undefined”||!window.supabaseClient.auth){
+console.error(“Supabase no disponible después de esperar”);
+renderLoginScreen();
+return;
+}
+try{
 const{data,error}=await window.supabaseClient.auth.getSession();
 if(error){console.error(“Auth session error:”,error);renderLoginScreen();return;}
 window.supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session)startAuthenticatedApp(session);else renderLoginScreen();});
 if(data?.session)startAuthenticatedApp(data.session);else renderLoginScreen();
+}catch(e){
+console.error(“initAuth error:”,e);
+renderLoginScreen();
+}
 }
 function initDashboard(){setupNavigation();setupFileUpload();setupButtons();updateVisibleSections(views.resumen.visible);loadData();}
 document.addEventListener(“DOMContentLoaded”,initAuth);
