@@ -924,25 +924,37 @@ if(typeof selectedIds!==“undefined”&&selectedIds?.clear)selectedIds.clear();
 renderLoginScreen();
 }
 async function initAuth(){
-// Retry hasta 20 veces (4 segundos) esperando que supabaseClient cargue
+// Mostrar login inmediatamente — antes de cualquier verificación
+renderLoginScreen();
+
+// Esperar hasta 4s a que supabaseClient esté disponible
 let intentos = 0;
 while((typeof window.supabaseClient===“undefined”||!window.supabaseClient.auth) && intentos < 20){
 await new Promise(r=>setTimeout(r,200));
 intentos++;
 }
 if(typeof window.supabaseClient===“undefined”||!window.supabaseClient.auth){
-console.error(“Supabase no disponible después de esperar”);
-renderLoginScreen();
-return;
+console.error(”[Junqo] supabaseClient no disponible”);
+return; // login ya está visible
 }
+
 try{
+// Suscribirse a cambios de auth ANTES de getSession
+window.supabaseClient.auth.onAuthStateChange((_event,session)=>{
+if(session) startAuthenticatedApp(session);
+else renderLoginScreen();
+});
+
+```
+// Verificar si hay sesión activa
 const{data,error}=await window.supabaseClient.auth.getSession();
-if(error){console.error(“Auth session error:”,error);renderLoginScreen();return;}
-window.supabaseClient.auth.onAuthStateChange((_event,session)=>{if(session)startAuthenticatedApp(session);else renderLoginScreen();});
-if(data?.session)startAuthenticatedApp(data.session);else renderLoginScreen();
+if(error){ console.error("[Junqo] Auth error:",error); return; }
+if(data?.session) startAuthenticatedApp(data.session);
+// Si no hay sesión, el login ya está visible — no hacer nada
+```
+
 }catch(e){
-console.error(“initAuth error:”,e);
-renderLoginScreen();
+console.error(”[Junqo] initAuth error:”,e);
 }
 }
 function initDashboard(){setupNavigation();setupFileUpload();setupButtons();updateVisibleSections(views.resumen.visible);loadData();}
