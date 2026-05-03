@@ -2524,14 +2524,14 @@ window.toggleDetalle = function () {
 };
 
 function toggleMenu() {
-  const sidebar = document.querySelector(".sidebar");
-  sidebar.classList.toggle("open");
+  const menu =
+    document.querySelector(".sidebar") ||
+    document.querySelector(".side-menu") ||
+    document.querySelector("aside") ||
+    document.querySelector("nav");
+
+  if (menu) {
+    menu.classList.toggle("open");
+  }
 }
-
-document.querySelectorAll(".sidebar a").forEach(link => {
-  link.addEventListener("click", () => {
-    document.querySelector(".sidebar").classList.remove("open");
-  });
-});
-
 
