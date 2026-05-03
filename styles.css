@@ -1830,6 +1830,6 @@ svg { display: inline-block; vertical-align: middle; }
   display: flex !important;
   position: fixed !important;
   top: 100px !important;
-  left: 8px !important;
+  left: env(safe-area-inset-left) !important;
   z-index: 1000000 !important;
 }
