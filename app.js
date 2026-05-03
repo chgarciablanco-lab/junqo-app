@@ -2524,11 +2524,9 @@ window.toggleDetalle = function () {
 };
 
 function toggleMenu() {
-  const menu =
-    document.querySelector(".sidebar") ||
-    document.querySelector(".side-menu") ||
-    document.querySelector("aside") ||
-    document.querySelector("nav");
+  const menu = document.querySelector(".sidebar");
+
+  console.log("Menú encontrado:", menu);
 
   if (menu) {
     menu.classList.toggle("open");
