@@ -1826,11 +1826,10 @@ svg { display: inline-block; vertical-align: middle; }
     transform: translateX(0) !important;
   }
 
-  .menu-toggle {
-    display: flex !important;
-    position: fixed !important;
-    top: 100px !important;
-    left: 28px !important;
-    z-index: 1000000 !important;
-  }
+.menu-toggle {
+  display: flex !important;
+  position: fixed !important;
+  top: 100px !important;
+  left: 8px !important;
+  z-index: 1000000 !important;
 }
