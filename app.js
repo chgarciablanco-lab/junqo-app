@@ -2525,11 +2525,5 @@ window.toggleDetalle = function () {
 
 function toggleMenu() {
   const menu = document.querySelector(".sidebar");
-
-  console.log("Menú encontrado:", menu);
-
-  if (menu) {
-    menu.classList.toggle("open");
-  }
+  menu.classList.toggle("open");
 }
-
