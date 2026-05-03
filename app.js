@@ -2523,5 +2523,15 @@ window.toggleDetalle = function () {
   el.style.display = el.style.display === "none" ? "block" : "none";
 };
 
+function toggleMenu() {
+  const sidebar = document.querySelector(".sidebar");
+  sidebar.classList.toggle("open");
+}
+
+document.querySelectorAll(".sidebar a").forEach(link => {
+  link.addEventListener("click", () => {
+    document.querySelector(".sidebar").classList.remove("open");
+  });
+});
 
 
