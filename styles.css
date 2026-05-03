@@ -1804,3 +1804,49 @@ svg { display: inline-block; vertical-align: middle; }
     padding-left: 48px;
   }
 }
+
+@media (max-width: 768px) {
+  aside,
+  nav,
+  .sidebar,
+  .side-menu {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    height: 100vh;
+    z-index: 9999;
+    background: white;
+    transition: left 0.25s ease;
+    overflow-y: auto;
+  }
+
+  aside.open,
+  nav.open,
+  .sidebar.open,
+  .side-menu.open {
+    left: 0;
+  }
+
+  .menu-toggle {
+    display: flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 10000;
+    background: #0f172a;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 22px;
+  }
+
+  main,
+  .main-content,
+  .content {
+    width: 100%;
+    margin-left: 0;
+    padding-top: 60px;
+  }
+}
