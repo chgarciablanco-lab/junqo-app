@@ -74,8 +74,8 @@ async function handleCartolaUpload(event) {
   if (!file) return;
 
   const ext = getFileExtension(file.name);
-  if (!["xls", "xlsx", "csv"].includes(ext)) {
-    showToast("⚠️ Solo se aceptan Excel o CSV para cartolas.");
+  if (!["xls", "xlsx", "csv", "pdf"].includes(ext)) {
+    showToast("⚠️ Solo se aceptan Excel, CSV o PDF para cartolas.");
     event.target.value = "";
     return;
   }
@@ -95,8 +95,9 @@ async function handleCartolaUpload(event) {
   if (statusEl) { statusEl.textContent = "⏳ Procesando cartola..."; statusEl.style.display = "block"; }
 
   let rows = [];
-  if (ext === "csv") rows = await parseCSVBanco(file, PROJECT_NAME);
-  else               rows = await parseSpreadsheetBanco(file, PROJECT_NAME);
+  if (ext === "pdf")        rows = await parsePDFBanco(file, PROJECT_NAME);
+  else if (ext === "csv")   rows = await parseCSVBanco(file, PROJECT_NAME);
+  else                      rows = await parseSpreadsheetBanco(file, PROJECT_NAME);
 
   if (!rows.length) {
     showToast("❌ No se reconocieron movimientos. Verifica el formato del archivo.");
@@ -183,14 +184,14 @@ function renderConciliacion() {
         <div class="card-sub">Excel o CSV de Banco Chile, Santander, BCI, Estado, Scotiabank u otro</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <input type="file" id="cartola-file-input" accept=".xls,.xlsx,.csv" hidden/>
+        <input type="file" id="cartola-file-input" accept=".xls,.xlsx,.csv,.pdf" hidden/>
         <button class="jv-nuevo-btn" onclick="$('cartola-file-input').click()">📂 Subir cartola</button>
       </div>
     </div>
     <div id="cartola-upload-status" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);padding:8px 0"></div>
     <div class="conc-hint">
       💡 La cartola debe tener columnas de <strong>Fecha</strong>, <strong>Descripción/Glosa</strong> y montos (<strong>Cargo/Abono</strong> o <strong>Monto</strong>).
-      Formatos aceptados: Banco Chile, Santander, BCI, Estado, Scotiabank y cualquier banco que exporte Excel o CSV estándar.
+      Formatos aceptados: <strong>PDF, Excel y CSV</strong> — Banco Chile, Santander, BCI, Estado, Scotiabank.
     </div>
   </div>
 
