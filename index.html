@@ -20,6 +20,7 @@
       <button class="nav-btn" data-view="proveedores">Proveedores</button>
       <button class="nav-btn" data-view="insumos">Insumos</button>
       <button class="nav-btn" data-view="caja">Caja e IVA</button>
+      <button class="nav-btn" data-view="conciliacion">Conciliación</button>
       <button class="nav-btn" data-view="control-financiero">Control Financiero</button>
       <button class="nav-btn" data-view="reportes">Reportes</button>
       <button class="nav-btn" data-view="configuracion">Configuración</button>
@@ -163,7 +164,6 @@
               <button class="export-btn export-btn-xl" id="btn-export-excel">⬇ Excel</button>
             </div>
           </div>
-          <!-- Barra selección masiva (se muestra solo al seleccionar) -->
           <div id="bulk-bar" class="bulk-bar bulk-bar-hidden">
             <span id="bulk-count" class="bulk-count">0 seleccionados</span>
             <button class="bulk-delete-btn" id="btn-bulk-delete">🗑️ Eliminar seleccionados</button>
@@ -200,7 +200,6 @@
             <div id="control-cat"></div>
           </div>
         </div>
-        <!-- Presupuesto editable -->
         <div class="card">
           <div class="card-title">⚙️ Presupuesto del Proyecto</div>
           <div class="card-sub">Edita el presupuesto referencial. Se guarda en Supabase.</div>
@@ -250,6 +249,11 @@
         </div>
       </section>
 
+      <!-- ── CONCILIACIÓN BANCARIA ── -->
+      <section class="module-block module-hidden" id="section-conciliacion">
+        <div id="conciliacion-root"></div>
+      </section>
+
       <!-- ── CONTROL FINANCIERO ── -->
       <section class="module-block module-hidden" id="section-control-financiero">
         <div id="cf-root"></div>
@@ -257,7 +261,6 @@
 
       <!-- ── REPORTES ── -->
       <section class="module-block module-hidden" id="section-reportes">
-        <!-- Encabezado del Reporte Ejecutivo -->
         <div class="report-header">
           <div class="report-header-left">
             <h1 class="report-title">Reporte Ejecutivo — Casa Junquillar</h1>
@@ -273,8 +276,6 @@
             <button class="btn" id="btn-ver-detalle" onclick="toggleDetalle()">👁️ Ver detalle</button>
           </div>
         </div>
-
-        <!-- KPIs Principales -->
         <div class="kpi-grid" id="report-kpis">
           <div class="card kpi-card">
             <div class="kpi-icon">💰</div>
@@ -306,17 +307,11 @@
             </div>
           </div>
         </div>
-
-        <!-- Diagnóstico del período -->
         <div class="card" id="report-diagnostico">
           <div class="card-title">📋 Diagnóstico del período</div>
           <div class="card-sub">Resumen ejecutivo basado en los datos disponibles</div>
-          <div class="diagnostico-text" id="diagnostico-text">
-            Cargando diagnóstico...
-          </div>
+          <div class="diagnostico-text" id="diagnostico-text">Cargando diagnóstico...</div>
         </div>
-
-        <!-- Alertas del período -->
         <div class="card" id="report-alertas">
           <div class="card-title">⚠️ Alertas del período</div>
           <div class="card-sub">Estado actual del proyecto</div>
@@ -324,8 +319,6 @@
             <div class="alerta-item alerta-info">Sin alertas registradas</div>
           </div>
         </div>
-
-        <!-- Gráficos -->
         <div class="report-charts-grid">
           <div class="card">
             <div class="card-title">📊 Presupuesto vs. Ejecutado</div>
@@ -349,8 +342,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Resumen por Categoría -->
         <div class="card" id="report-resumen-categoria">
           <div class="card-title">📋 Resumen por Categoría</div>
           <div class="card-sub">Detalle por partida presupuestaria</div>
@@ -371,8 +362,6 @@
             </table>
           </div>
         </div>
-
-        <!-- Resumen Tributario -->
         <div class="card" id="report-tributario">
           <div class="card-title">🧾 Resumen Tributario</div>
           <div class="card-sub">Estado de documentación tributaria</div>
@@ -395,8 +384,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Exportación y Configuración (oculto por defecto) -->
         <div class="report-extras" id="report-extras" style="display:none">
           <div class="card">
             <div class="card-title">📥 Exportar reportes</div>
@@ -660,7 +647,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="supabaseClient.js"></script>
 <script src="app.js"></script>
+<script src="banco-parser.js"></script>
+<script src="conciliacion-module.js"></script>
 </body>
 </html>
