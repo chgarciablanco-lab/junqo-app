@@ -1283,6 +1283,7 @@ function setupNavigation(){
   const buttons=document.querySelectorAll(".nav-btn"),title=$("page-title"),subtitle=$("page-subtitle");
   buttons.forEach(btn=>btn.addEventListener("click",()=>{
     buttons.forEach(b=>b.classList.remove("active"));btn.classList.add("active");
+    document.body.classList.remove("mobile-menu-open");
     currentView=btn.dataset.view;
     const view=views[currentView]||views.resumen;
     if(title)title.textContent=view.title;
@@ -2529,6 +2530,5 @@ window.toggleDetalle = function () {
 window.renderConciliacion = typeof renderConciliacion !== "undefined" ? renderConciliacion : function(){};
 
 function toggleMenu() {
-  const menu = document.querySelector(".sidebar");
-  menu.classList.toggle("open");
+  document.body.classList.toggle("mobile-menu-open");
 }
