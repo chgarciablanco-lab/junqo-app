@@ -31,6 +31,7 @@ const views = {
   reportes:             { title:"Reportes",             subtitle:"Análisis resumido por categoría y mes",                     visible:["section-reportes"] },
   ventas:       { title:"Ventas",            subtitle:"Ingresos, cotizaciones y contactos del proyecto",     visible:["section-ventas"] },
   insumos:      { title:"Insumos",           subtitle:"Control de materiales y stock en obra",               visible:["section-insumos"] },
+  conciliacion: { title:"Conciliación",       subtitle:"Cuadratura bancaria — cartola vs gastos registrados", visible:["section-conciliacion"] },
   configuracion:{ title:"Configuración",     subtitle:"Ajustes generales del proyecto y apariencia",         visible:["section-config"] }
 };
 
@@ -143,6 +144,7 @@ async function loadData(){
   if(error){console.error(error);gastos=[];filteredDocs=[];renderAll();return;}
   gastos=(data||[]).map(mapSupabaseRow);filteredDocs=[...gastos];
   await loadBudget();
+  if(typeof loadMovimientosBanco==="function") await loadMovimientosBanco();
   renderAll();
 }
 
@@ -1491,6 +1493,7 @@ function renderAll(){
   safe(renderVentas);safe(renderInsumos);safe(renderConfiguracion);
   safe(renderDocumentoLog);
   safe(renderControlFinanciero);
+  safe(renderConciliacion);
 }
 
 /* ── EXPORTACIONES ────────────────────────────────────────── */
@@ -2522,6 +2525,8 @@ window.toggleDetalle = function () {
   if (!el) return;
   el.style.display = el.style.display === "none" ? "block" : "none";
 };
+
+window.renderConciliacion = typeof renderConciliacion !== "undefined" ? renderConciliacion : function(){};
 
 function toggleMenu() {
   const menu = document.querySelector(".sidebar");
