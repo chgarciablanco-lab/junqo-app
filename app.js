@@ -1365,141 +1365,124 @@ function renderControlFinanciero() {
   const el = $("cf-root");
   if (!el) return;
 
-  const d  = cfDemoData;
-  const mv = (obj, m) => numberValue(obj[m]);
+  /* ── Helpers ─────────────────────────────────────────────── */
+  const addMonths = (ym, n) => {
+    let [y, m] = ym.split("-").map(Number);
+    m += n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;}
+    return `${y}-${String(m).padStart(2,"0")}`;
+  };
+  const MESES_LABEL = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const ymLabel = ym => { const[y,m]=ym.split("-"); return `${MESES_LABEL[Number(m)-1]} ${y}`; };
+  const hoy    = new Date();
+  const mesHoy = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
 
-  /* ── Inicio del proyecto: qué mes real = M0 ───────────────
-     El usuario elige el mes de inicio con un input type="month".
-     M0 = ese mes, Ene = +1, Feb = +2, ... Dic = +12.
-  ─────────────────────────────────────────────────────────── */
-  const hoy       = new Date();
-  const mesHoyYM  = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
-
-  // Mes de inicio guardado (default = mes más antiguo de los datos o hace 1 año)
+  /* ── Filtros de rango ─────────────────────────────────────── */
   const _primerDato = [
-    ...gastos.map(g => fechaOrdenable(g.fecha)),
-    ...(typeof ventasIngresos !== "undefined" ? ventasIngresos.map(v => fechaOrdenable(v.fecha)) : []),
-    ...(typeof movBanco !== "undefined" ? movBanco.map(m => fechaOrdenable(m.fecha)) : [])
+    ...gastos.map(g=>fechaOrdenable(g.fecha)),
+    ...(typeof ventasIngresos!=="undefined"?ventasIngresos.map(v=>fechaOrdenable(v.fecha)):[]),
+    ...(typeof movBanco!=="undefined"?movBanco.map(m=>fechaOrdenable(m.fecha)):[])
   ].filter(Boolean).sort()[0];
-  const defaultInicio = _primerDato ? _primerDato.slice(0,7) : `${hoy.getFullYear()-1}-${String(hoy.getMonth()+1).padStart(2,"0")}`;
+  const defaultInicio = _primerDato ? _primerDato.slice(0,7) : addMonths(mesHoy,-1);
 
   const cfInicio = localStorage.getItem("junqo_cf_inicio") || defaultInicio;
   const cfDesde  = localStorage.getItem("junqo_cf_desde")  || cfInicio;
-  const cfHasta  = localStorage.getItem("junqo_cf_hasta")  || mesHoyYM;
+  const cfHasta  = localStorage.getItem("junqo_cf_hasta")  || mesHoy;
 
-  /* ── Mapear M0..Dic a fechas reales ──────────────────────── */
-  const CF_KEYS = ["M0","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-
-  // cfInicio = M0. Ene = cfInicio+1, Feb = cfInicio+2, etc.
-  const addMonths = (ym, n) => {
-    let [y, m] = ym.split("-").map(Number);
-    m += n;
-    while (m > 12) { m -= 12; y++; }
-    while (m < 1)  { m += 12; y--; }
-    return `${y}-${String(m).padStart(2,"0")}`;
-  };
-
-  // Mapa clave → YYYY-MM real
-  const keyToYM = {};
-  CF_KEYS.forEach((k, i) => { keyToYM[k] = addMonths(cfInicio, i); });
-
-  // Mapa YYYY-MM → clave CF
-  const ymToKey = {};
-  Object.entries(keyToYM).forEach(([k, ym]) => { ymToKey[ym] = k; });
-
-  // Generar columnas visibles (YYYY-MM entre cfDesde y cfHasta, máx 24)
+  /* ── Generar columnas visibles (YYYY-MM) ─────────────────── */
   const visibleYMs = [];
   let cur = cfDesde <= cfHasta ? cfDesde : cfHasta;
   const end = cfDesde <= cfHasta ? cfHasta : cfDesde;
-  while (cur <= end && visibleYMs.length < 24) {
-    visibleYMs.push(cur);
-    cur = addMonths(cur, 1);
+  while (cur <= end && visibleYMs.length < 24) { visibleYMs.push(cur); cur = addMonths(cur,1); }
+
+  if (!visibleYMs.length) {
+    el.innerHTML=`<div class="card"><div class="empty-state">Selecciona un rango de fechas válido.</div></div>`;
+    return;
   }
 
-  // Label de columna: "Dic 2025"
-  const MESES_LABEL = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-  const ymLabel = ym => {
-    const [y, m] = ym.split("-");
-    return `${MESES_LABEL[Number(m)-1]} ${y}`;
-  };
-
-  /* ── Aportes reales por YYYY-MM ───────────────────────────── */
-  const aportesRealesPorYM  = {};
-  const aportesTerrePorYM   = {};
-
-  const addAp = (obj, ym, v) => { obj[ym] = (obj[ym]||0) + v; };
-
-  for (const ing of (typeof ventasIngresos !== "undefined" ? ventasIngresos : [])) {
-    if (ing.estado !== "Recibido") continue;
-    const ym = (fechaOrdenable(ing.fecha)||"").slice(0,7);
+  /* ── Agrupar gastos reales por YYYY-MM y categoría ────────── */
+  const gastosPorMes = {}; // { "2026-03": { "Materiales": 1234, ... } }
+  const categoriasSet = new Set();
+  for (const g of gastos) {
+    const ym = (fechaOrdenable(g.fecha)||"").slice(0,7);
     if (!ym) continue;
-    const cat = (ing.categoria_contable||"").toLowerCase();
-    if (cat.includes("terreno")) addAp(aportesTerrePorYM, ym, numberValue(ing.monto));
-    else                          addAp(aportesRealesPorYM, ym, numberValue(ing.monto));
+    const cat = g.categoria || "Sin categoría";
+    categoriasSet.add(cat);
+    if (!gastosPorMes[ym]) gastosPorMes[ym] = {};
+    gastosPorMes[ym][cat] = (gastosPorMes[ym][cat]||0) + numberValue(g.neto);
   }
-  for (const mov of (typeof movBanco !== "undefined" ? movBanco : [])) {
-    if (mov.tipo !== "abono") continue;
-    const ym = (fechaOrdenable(mov.fecha)||"").slice(0,7);
+  const categorias = [...categoriasSet].sort((a,b)=>{
+    // Ordenar por total descendente
+    const ta = Object.values(gastosPorMes).reduce((s,m)=>s+(m[a]||0),0);
+    const tb = Object.values(gastosPorMes).reduce((s,m)=>s+(m[b]||0),0);
+    return tb-ta;
+  });
+
+  /* ── Ingresos por venta (desde ventasIngresos) ────────────── */
+  const ventasPorMes = {};
+  for (const ing of (typeof ventasIngresos!=="undefined"?ventasIngresos:[])) {
+    if ((ing.categoria_contable||"").toLowerCase().includes("venta")) {
+      const ym = (fechaOrdenable(ing.fecha)||"").slice(0,7);
+      if (ym) ventasPorMes[ym] = (ventasPorMes[ym]||0) + numberValue(ing.monto);
+    }
+  }
+
+  /* ── Aportes por YYYY-MM ──────────────────────────────────── */
+  const aportesRealesPorYM = {};
+  const aportesTerrePorYM  = {};
+  const addAp = (obj,ym,v) => { obj[ym]=(obj[ym]||0)+v; };
+
+  for (const ing of (typeof ventasIngresos!=="undefined"?ventasIngresos:[])) {
+    if (ing.estado!=="Recibido") continue;
+    if ((ing.categoria_contable||"").toLowerCase().includes("venta")) continue;
+    const ym=(fechaOrdenable(ing.fecha)||"").slice(0,7); if(!ym) continue;
+    if ((ing.categoria_contable||"").toLowerCase().includes("terreno"))
+      addAp(aportesTerrePorYM, ym, numberValue(ing.monto));
+    else addAp(aportesRealesPorYM, ym, numberValue(ing.monto));
+  }
+  for (const mov of (typeof movBanco!=="undefined"?movBanco:[])) {
+    if (mov.tipo!=="abono") continue;
+    const ym=(fechaOrdenable(mov.fecha)||"").slice(0,7);
     if (ym) addAp(aportesRealesPorYM, ym, numberValue(mov.monto));
   }
 
-  // Convertir por YYYY-MM a por clave CF (usando ymToKey)
-  const aportesReales  = {};
-  const aportesTerreno = {};
-  Object.entries(aportesRealesPorYM).forEach(([ym,v]) => {
-    const k = ymToKey[ym]; if (k) aportesReales[k]  = (aportesReales[k]||0)  + v;
-  });
-  Object.entries(aportesTerrePorYM).forEach(([ym,v]) => {
-    const k = ymToKey[ym]; if (k) aportesTerreno[k] = (aportesTerreno[k]||0) + v;
-  });
-
-  /* ── Cálculos por clave CF (todos los meses) ──────────────── */
+  /* ── Totales por mes ──────────────────────────────────────── */
   let cajaAcum = 0;
   const C = {};
-  for (const m of CF_KEYS) {
-    const ingresos   = mv(d.ventaCasa,m) + mv(d.otrosIngresos,m);
-    const gastosOp   = d.gastosOp.reduce( (s,r)=>s+mv(r,m),0);
-    const gastosAdm  = d.gastosAdm.reduce((s,r)=>s+mv(r,m),0);
-    const ebitda     = ingresos - gastosOp - gastosAdm;
-    const impuesto   = mv(d.impuesto,m);
-    const resultado  = ebitda - impuesto;
-    const aporteReal    = aportesReales[m]  || 0;
-    const aporteTerreno = aportesTerreno[m] || 0;
-    const financ        = aporteReal + aporteTerreno + mv(d.creditoHipotecario,m);
-    const cajaNeta      = resultado + financ;
-    cajaAcum           += cajaNeta;
-    C[m] = { ingresos, gastosOp, gastosAdm, ebitda, impuesto, resultado,
-              financ, aporteReal, aporteTerreno, cajaNeta, cajaAcum };
+  for (const ym of visibleYMs) {
+    const ingVenta    = ventasPorMes[ym] || 0;
+    const gastoTotal  = categorias.reduce((s,cat)=>s+(gastosPorMes[ym]?.[cat]||0),0);
+    const resultado   = ingVenta - gastoTotal;
+    const apTerreno   = aportesTerrePorYM[ym]  || 0;
+    const apCapital   = aportesRealesPorYM[ym]  || 0;
+    const financ      = apTerreno + apCapital;
+    const cajaNeta    = resultado + financ;
+    cajaAcum         += cajaNeta;
+    C[ym] = { ingVenta, gastoTotal, resultado, apTerreno, apCapital, financ, cajaNeta, cajaAcum };
   }
 
-  /* ── KPIs del rango visible ───────────────────────────────── */
-  const visKeys = visibleYMs.map(ym => ymToKey[ym]).filter(Boolean);
-  const kpiResultado = visKeys.reduce((s,m)=>s+C[m].resultado,0);
-  const kpiFinanc    = visKeys.reduce((s,m)=>s+C[m].financ,   0);
-  const kpiCaja      = visKeys.length ? C[visKeys[visKeys.length-1]].cajaAcum : 0;
+  /* ── KPIs ─────────────────────────────────────────────────── */
+  const totGasto   = visibleYMs.reduce((s,ym)=>s+C[ym].gastoTotal,0);
+  const totIngVenta= visibleYMs.reduce((s,ym)=>s+C[ym].ingVenta,  0);
+  const totFinanc  = visibleYMs.reduce((s,ym)=>s+C[ym].financ,    0);
+  const cajaFinal  = C[visibleYMs[visibleYMs.length-1]].cajaAcum;
 
   /* ── Formato ──────────────────────────────────────────────── */
-  const fmt    = v => (!v||v===0) ? `<span class="cf-zero">$0</span>`
-    : v<0 ? `<span class="cf-neg">-$${Math.abs(v).toLocaleString("es-CL")}</span>`
-           : `<span class="cf-pos">$${v.toLocaleString("es-CL")}</span>`;
+  const fmt = v => (!v||v===0)
+    ? `<span class="cf-zero">$0</span>`
+    : v<0 ? `<span class="cf-neg">-$${Math.abs(Math.round(v)).toLocaleString("es-CL")}</span>`
+           : `<span class="cf-pos">$${Math.round(v).toLocaleString("es-CL")}</span>`;
   const fmtKpi = v => { const s=Math.abs(Math.round(v)).toLocaleString("es-CL"); return v<0?`-$${s}`:`$${s}`; };
-  const kpiClr = v => v>=0 ? "var(--brand)" : "var(--red)";
+  const kpiClr = v => v>=0?"var(--brand)":"var(--red)";
 
-  /* ── Constructores de filas (usando visibleYMs) ───────────── */
+  /* ── Constructores de filas ───────────────────────────────── */
   const nCols = visibleYMs.length + 1;
   const secRow  = lbl => `<tr class="cf-sec-row"><td colspan="${nCols}">${lbl}</td></tr>`;
   const dataRow = (lbl, fn, cls="") =>
     `<tr class="cf-data-row${cls?" "+cls:""}"><td class="cf-lbl">${lbl}</td>` +
-    visibleYMs.map(ym => { const k=ymToKey[ym]; return `<td class="cf-num">${fmt(k?fn(k):0)}</td>`; }).join("") +
-    `</tr>`;
-  const totRow  = (lbl, key) =>
-    `<tr class="cf-tot-row"><td class="cf-lbl">${lbl}</td>` +
-    visibleYMs.map(ym => { const k=ymToKey[ym]; return `<td class="cf-num">${fmt(k?C[k][key]:0)}</td>`; }).join("") +
-    `</tr>`;
-  const keyRow  = (lbl, key, cls) =>
+    visibleYMs.map(ym=>`<td class="cf-num">${fmt(fn(ym))}</td>`).join("") + `</tr>`;
+  const totRow  = (lbl, key, cls="cf-tot-row") =>
     `<tr class="${cls}"><td class="cf-lbl">${lbl}</td>` +
-    visibleYMs.map(ym => { const k=ymToKey[ym]; return `<td class="cf-num">${fmt(k?C[k][key]:0)}</td>`; }).join("") +
-    `</tr>`;
+    visibleYMs.map(ym=>`<td class="cf-num">${fmt(C[ym][key])}</td>`).join("") + `</tr>`;
   const spacer  = () => `<tr class="cf-spacer-row"><td colspan="${nCols}"></td></tr>`;
 
   el.innerHTML = `
@@ -1507,14 +1490,10 @@ function renderControlFinanciero() {
     <div class="card-header-row" style="flex-wrap:wrap;gap:12px">
       <div>
         <div class="card-title">Control Financiero Mensual</div>
-        <div class="card-sub">Flujo financiero del proyecto · sin IVA</div>
+        <div class="card-sub">Datos reales de Supabase · sin IVA</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted)">
-        <span>Inicio proyecto</span>
-        <input type="month" class="filter-select" style="height:34px;font-size:12px" value="${cfInicio}"
-          title="Mes que corresponde al inicio del proyecto (M0)"
-          onchange="localStorage.setItem('junqo_cf_inicio',this.value);localStorage.removeItem('junqo_cf_desde');localStorage.removeItem('junqo_cf_hasta');renderControlFinanciero()"/>
-        <span style="margin-left:8px">Desde</span>
+        <span>Desde</span>
         <input type="month" class="filter-select" style="height:34px;font-size:12px" value="${cfDesde}"
           onchange="localStorage.setItem('junqo_cf_desde',this.value);renderControlFinanciero()"/>
         <span>Hasta</span>
@@ -1527,18 +1506,18 @@ function renderControlFinanciero() {
 
     <div class="cf-kpi-grid">
       <div class="cf-kpi-card">
-        <div class="cf-kpi-lbl">Resultado acumulado</div>
-        <div class="cf-kpi-val" style="color:${kpiClr(kpiResultado)}">${fmtKpi(kpiResultado)}</div>
-        <div class="cf-kpi-sub">Resultado después de impuesto</div>
+        <div class="cf-kpi-lbl">Total gastos netos</div>
+        <div class="cf-kpi-val" style="color:var(--red)">${fmtKpi(totGasto)}</div>
+        <div class="cf-kpi-sub">${gastos.length} documentos · ${categorias.length} categorías</div>
       </div>
       <div class="cf-kpi-card">
-        <div class="cf-kpi-lbl">Financiamiento total</div>
-        <div class="cf-kpi-val" style="color:var(--brand)">${fmtKpi(kpiFinanc)}</div>
-        <div class="cf-kpi-sub">Aportes + crédito hipotecario</div>
+        <div class="cf-kpi-lbl">Aportes recibidos</div>
+        <div class="cf-kpi-val" style="color:var(--green)">${fmtKpi(totFinanc)}</div>
+        <div class="cf-kpi-sub">Capital terreno + construcción</div>
       </div>
       <div class="cf-kpi-card">
         <div class="cf-kpi-lbl">Caja acumulada</div>
-        <div class="cf-kpi-val" style="color:${kpiClr(kpiCaja)}">${fmtKpi(kpiCaja)}</div>
+        <div class="cf-kpi-val" style="color:${kpiClr(cajaFinal)}">${fmtKpi(cajaFinal)}</div>
         <div class="cf-kpi-sub">Posición al cierre del período</div>
       </div>
     </div>
@@ -1548,38 +1527,31 @@ function renderControlFinanciero() {
         <thead>
           <tr>
             <th class="cf-th-lbl">Concepto</th>
-            ${visibleYMs.map(ym => `<th class="cf-th-month">${ymLabel(ym)}</th>`).join("")}
+            ${visibleYMs.map(ym=>`<th class="cf-th-month">${ymLabel(ym)}</th>`).join("")}
           </tr>
         </thead>
         <tbody>
-          ${secRow("INGRESOS")}
-          ${dataRow("Venta casa",     m => mv(d.ventaCasa,m))}
-          ${dataRow("Otros ingresos", m => mv(d.otrosIngresos,m))}
-          ${totRow("Total ingresos", "ingresos")}
+          ${secRow("INGRESOS POR VENTA")}
+          ${dataRow("Venta propiedad", ym => ventasPorMes[ym]||0)}
+          ${totRow("Total ingresos", "ingVenta")}
 
-          ${secRow("GASTOS OPERACIONALES / OBRA")}
-          ${d.gastosOp.map(r => dataRow(r.label, m => mv(r,m))).join("")}
-          ${totRow("Total gastos operacionales", "gastosOp")}
-
-          ${secRow("GASTOS ADMINISTRATIVOS")}
-          ${d.gastosAdm.map(r => dataRow(r.label, m => mv(r,m))).join("")}
-          ${totRow("Total gastos administrativos", "gastosAdm")}
+          ${secRow("GASTOS — por categoría")}
+          ${categorias.map(cat =>
+            dataRow(cat, ym => -(gastosPorMes[ym]?.[cat]||0))
+          ).join("")}
+          ${totRow("Total gastos", "gastoTotal", "cf-tot-row")}
 
           ${spacer()}
-          ${keyRow("EBITDA / resultado antes de impuesto", "ebitda",    "cf-ebitda-row")}
-          ${dataRow("Impuesto estimado", m => mv(d.impuesto,m))}
-          ${keyRow("Resultado después de impuesto",        "resultado", "cf-result-row")}
+          ${totRow("Resultado operacional", "resultado", "cf-ebitda-row")}
 
           ${secRow("FINANCIAMIENTO")}
-          ${dataRow("Aporte capital terreno", m => C[m]?.aporteTerreno || 0)}
-          ${dataRow("Aporte de capital",      m => C[m]?.aporteReal    || 0)}
-          ${dataRow("Crédito hipotecario bancario", m => mv(d.creditoHipotecario,m))}
+          ${dataRow("Aporte capital terreno", ym => C[ym].apTerreno)}
+          ${dataRow("Aporte de capital",      ym => C[ym].apCapital)}
           ${totRow("Total financiamiento", "financ")}
 
           ${spacer()}
-          ${dataRow("Financiamiento recibido", m => C[m]?.financ   || 0, "cf-financ-row")}
-          ${keyRow("Caja neta del mes",  "cajaNeta", "cf-cajaneta-row")}
-          ${keyRow("Caja acumulada",     "cajaAcum", "cf-cajaacum-row")}
+          ${totRow("Flujo neto del mes", "cajaNeta", "cf-cajaneta-row")}
+          ${totRow("Caja acumulada",     "cajaAcum", "cf-cajaacum-row")}
         </tbody>
       </table>
     </div>
