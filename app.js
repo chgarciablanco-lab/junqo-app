@@ -1339,101 +1339,148 @@ function renderDocumentoLog(){
 }
 
 /* ── RENDER ALL ───────────────────────────────────────────── */
-/* ── CONTROL FINANCIERO ───────────────────────────────────── */
+const CF_MONTHS = ["M0","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
 
-/* ── CONTROL FINANCIERO — datos reales Supabase ──────────── */
-function renderControlFinanciero(){
-  const el=$("cf-root");
-  if(!el) return;
+const cfDemoData = {
+  ventaCasa:     {M0:0,Ene:0,Feb:0,Mar:0,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  otrosIngresos: {M0:0,Ene:0,Feb:0,Mar:0,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  gastosOp: [
+    {label:"Terreno",          M0:100000000,Ene:0,        Feb:0,        Mar:0,        Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+    {label:"Materiales",       M0:0,        Ene:18500000, Feb:22000000, Mar:12236637, Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+    {label:"Mano de obra",     M0:0,        Ene:4000000,  Feb:6000000,  Mar:5000000,  Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+    {label:"Subcontratos",     M0:0,        Ene:0,        Feb:3000000,  Mar:2000000,  Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  ],
+  gastosAdm: [
+    {label:"Arquitecto / especialidades",    M0:2000000,Ene:0,     Feb:0,     Mar:0,     Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+    {label:"Contabilidad / legales / banco", M0:250000, Ene:250000,Feb:250000,Mar:250000,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+    {label:"Permisos / trámites",            M0:500000, Ene:0,     Feb:0,     Mar:0,     Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  ],
+  impuesto:           {M0:0,Ene:0,Feb:0,Mar:0,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  aporteCapital:      {M0:40000000,Ene:0,Feb:0,Mar:0,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+  creditoHipotecario: {M0:60000000,Ene:0,Feb:0,Mar:0,Abr:0,May:0,Jun:0,Jul:0,Ago:0,Sep:0,Oct:0,Nov:0,Dic:0},
+};
 
-  if(!gastos.length){
-    el.innerHTML=`<div class="card"><div class="empty-state">Sin gastos registrados aún.</div></div>`;
-    return;
+function renderControlFinanciero() {
+  const el = $("cf-root");
+  if (!el) return;
+
+  const d  = cfDemoData;
+  const ms = CF_MONTHS;
+  const mv = (obj, m) => numberValue(obj[m]);
+
+  // ── Cálculos por mes ──
+  let cajaAcum = 0;
+  const C = {};
+  for (const m of ms) {
+    const ingresos  = mv(d.ventaCasa, m) + mv(d.otrosIngresos, m);
+    const gastosOp  = d.gastosOp.reduce( (s, r) => s + mv(r, m), 0);
+    const gastosAdm = d.gastosAdm.reduce((s, r) => s + mv(r, m), 0);
+    const ebitda    = ingresos - gastosOp - gastosAdm;
+    const impuesto  = mv(d.impuesto, m);
+    const resultado = ebitda - impuesto;
+    const financ    = mv(d.aporteCapital, m) + mv(d.creditoHipotecario, m);
+    const cajaNeta  = resultado + financ;
+    cajaAcum       += cajaNeta;
+    C[m] = { ingresos, gastosOp, gastosAdm, ebitda, impuesto, resultado, financ, cajaNeta, cajaAcum };
   }
 
-  // Agrupar por mes
-  const byMonth={};
-  for(const g of gastos){
-    const m=(fechaOrdenable(g.fecha)||"").slice(0,7);
-    if(!m) continue;
-    if(!byMonth[m]) byMonth[m]=[];
-    byMonth[m].push(g);
-  }
-  const meses=Object.keys(byMonth).sort();
+  // ── KPI acumulados ──
+  const kpiResultado = ms.reduce((s, m) => s + C[m].resultado, 0);
+  const kpiFinanc    = ms.reduce((s, m) => s + C[m].financ, 0);
+  const kpiCaja      = C[ms[ms.length - 1]].cajaAcum;
 
-  // Aportes por mes
-  const ap=typeof ventasIngresos!=="undefined"?ventasIngresos.filter(v=>v.estado==="Recibido"):[];
-  const apMes={};
-  for(const v of ap){ const m=(fechaOrdenable(v.fecha)||"").slice(0,7); apMes[m]=(apMes[m]||0)+numberValue(v.monto); }
-
-  let cajaAcum=0;
-  const rows=meses.map(mes=>{
-    const gs=byMonth[mes]||[];
-    const neto=sumBy(gs,"neto"), iva=sumBy(gs,"iva");
-    const ingresos=apMes[mes]||0;
-    const flujo=ingresos-neto;
-    cajaAcum+=flujo;
-    return{mes,neto,iva,docs:gs.length,ingresos,flujo,cajaAcum};
-  });
-
-  const totNeto=sumBy(gastos,"neto"), totIva=sumBy(gastos,"iva");
-  const totIng=ap.reduce((a,v)=>a+numberValue(v.monto),0);
-  const resultado=totIng-totNeto;
-
-  const fclr=v=>v>=0?"var(--brand)":"var(--red)";
-  const fmt=v=>{
-    if(!v&&v!==0) return `<span style="color:var(--muted-soft)">$0</span>`;
-    const s=Math.abs(Math.round(v)).toLocaleString("es-CL");
-    return `<span style="color:${fclr(v)};font-weight:500">${v<0?"-$":"$"}${s}</span>`;
+  // ── Helpers de formato ──
+  const fmt = v => {
+    if (v === 0) return `<span class="cf-zero">$0</span>`;
+    const s = Math.abs(v).toLocaleString("es-CL");
+    return v < 0 ? `<span class="cf-neg">-$${s}</span>` : `<span class="cf-pos">$${s}</span>`;
   };
+  const fmtKpi = v => { const s = Math.abs(v).toLocaleString("es-CL"); return v < 0 ? `-$${s}` : `$${s}`; };
+  const kpiClr = v => v >= 0 ? "var(--brand)" : "var(--red)";
 
-  el.innerHTML=`
+  // ── Constructores de filas ──
+  const nCols = ms.length + 1;
+  const secRow  = lbl => `<tr class="cf-sec-row"><td colspan="${nCols}">${lbl}</td></tr>`;
+  const dataRow = (lbl, fn, cls = "") =>
+    `<tr class="cf-data-row${cls ? " " + cls : ""}">` +
+    `<td class="cf-lbl">${lbl}</td>` +
+    ms.map(m => `<td class="cf-num">${fmt(fn(m))}</td>`).join("") + `</tr>`;
+  const totRow = (lbl, key) =>
+    `<tr class="cf-tot-row"><td class="cf-lbl">${lbl}</td>` +
+    ms.map(m => `<td class="cf-num">${fmt(C[m][key])}</td>`).join("") + `</tr>`;
+  const keyRow = (lbl, key, cls) =>
+    `<tr class="${cls}"><td class="cf-lbl">${lbl}</td>` +
+    ms.map(m => `<td class="cf-num">${fmt(C[m][key])}</td>`).join("") + `</tr>`;
+  const spacerRow = () => `<tr class="cf-spacer-row"><td colspan="${nCols}"></td></tr>`;
+
+  el.innerHTML = `
   <div class="card">
-    <div class="card-title">Control Financiero Mensual</div>
-    <div class="card-sub">Flujo real de egresos e ingresos · datos desde Supabase · sin IVA</div>
-    <div class="cf-kpi-grid" style="margin:16px 0">
-      <div class="cf-kpi-card"><div class="cf-kpi-lbl">Gastos netos acumulados</div><div class="cf-kpi-val" style="color:var(--red)">$${Math.round(totNeto).toLocaleString("es-CL")}</div><div class="cf-kpi-sub">${gastos.length} documentos</div></div>
-      <div class="cf-kpi-card"><div class="cf-kpi-lbl">Aportes recibidos</div><div class="cf-kpi-val" style="color:var(--green)">$${Math.round(totIng).toLocaleString("es-CL")}</div><div class="cf-kpi-sub">${ap.length} ingresos</div></div>
-      <div class="cf-kpi-card"><div class="cf-kpi-lbl">Resultado neto</div><div class="cf-kpi-val" style="color:${fclr(resultado)}">${resultado<0?"-$":"$"}${Math.abs(Math.round(resultado)).toLocaleString("es-CL")}</div><div class="cf-kpi-sub">Ingresos menos gastos</div></div>
-      <div class="cf-kpi-card"><div class="cf-kpi-lbl">IVA crédito fiscal</div><div class="cf-kpi-val" style="color:var(--brand)">$${Math.round(totIva).toLocaleString("es-CL")}</div><div class="cf-kpi-sub">Recuperable al vender</div></div>
+    <div class="card-header-row">
+      <div>
+        <div class="card-title">Control Financiero Mensual</div>
+        <div class="card-sub">Flujo financiero mensual en pesos chilenos · sin IVA</div>
+      </div>
     </div>
+
+    <div class="cf-kpi-grid">
+      <div class="cf-kpi-card">
+        <div class="cf-kpi-lbl">Resultado acumulado</div>
+        <div class="cf-kpi-val" style="color:${kpiClr(kpiResultado)}">${fmtKpi(kpiResultado)}</div>
+        <div class="cf-kpi-sub">Resultado después de impuesto — suma del período</div>
+      </div>
+      <div class="cf-kpi-card">
+        <div class="cf-kpi-lbl">Financiamiento total</div>
+        <div class="cf-kpi-val" style="color:var(--brand)">${fmtKpi(kpiFinanc)}</div>
+        <div class="cf-kpi-sub">Aportes de socios + crédito hipotecario acumulado</div>
+      </div>
+      <div class="cf-kpi-card">
+        <div class="cf-kpi-lbl">Caja acumulada</div>
+        <div class="cf-kpi-val" style="color:${kpiClr(kpiCaja)}">${fmtKpi(kpiCaja)}</div>
+        <div class="cf-kpi-sub">Posición de caja al cierre del período registrado</div>
+      </div>
+    </div>
+
     <div class="cf-table-wrap">
       <table class="cf-table">
-        <thead><tr>
-          <th class="cf-th-lbl">Mes</th>
-          <th class="cf-th-month" style="text-align:right">Docs</th>
-          <th class="cf-th-month" style="text-align:right">Gastos netos</th>
-          <th class="cf-th-month" style="text-align:right">IVA CF</th>
-          <th class="cf-th-month" style="text-align:right">Aportes</th>
-          <th class="cf-th-month" style="text-align:right">Flujo neto</th>
-          <th class="cf-th-month" style="text-align:right">Caja acum.</th>
-        </tr></thead>
-        <tbody>
-          ${rows.map(r=>`<tr class="cf-data-row">
-            <td class="cf-lbl" style="font-weight:600">${mesLabelFromYM(r.mes)}</td>
-            <td class="cf-num">${r.docs}</td>
-            <td class="cf-num">${fmt(-r.neto)}</td>
-            <td class="cf-num">${fmt(r.iva)}</td>
-            <td class="cf-num">${fmt(r.ingresos)}</td>
-            <td class="cf-num">${fmt(r.flujo)}</td>
-            <td class="cf-num">${fmt(r.cajaAcum)}</td>
-          </tr>`).join("")}
-          <tr class="cf-tot-row">
-            <td class="cf-lbl">TOTAL</td>
-            <td class="cf-num">${gastos.length}</td>
-            <td class="cf-num">${fmt(-totNeto)}</td>
-            <td class="cf-num">${fmt(totIva)}</td>
-            <td class="cf-num">${fmt(totIng)}</td>
-            <td class="cf-num">${fmt(resultado)}</td>
-            <td class="cf-num">${fmt(rows.length?rows[rows.length-1].cajaAcum:0)}</td>
+        <thead>
+          <tr>
+            <th class="cf-th-lbl">Concepto</th>
+            ${ms.map(m => `<th class="cf-th-month">${m}</th>`).join("")}
           </tr>
+        </thead>
+        <tbody>
+          ${secRow("INGRESOS")}
+          ${dataRow("Venta casa",     m => mv(d.ventaCasa, m))}
+          ${dataRow("Otros ingresos", m => mv(d.otrosIngresos, m))}
+          ${totRow("Total ingresos", "ingresos")}
+
+          ${secRow("GASTOS OPERACIONALES / OBRA")}
+          ${d.gastosOp.map(r => dataRow(r.label, m => mv(r, m))).join("")}
+          ${totRow("Total gastos operacionales", "gastosOp")}
+
+          ${secRow("GASTOS ADMINISTRATIVOS")}
+          ${d.gastosAdm.map(r => dataRow(r.label, m => mv(r, m))).join("")}
+          ${totRow("Total gastos administrativos", "gastosAdm")}
+
+          ${spacerRow()}
+          ${keyRow("EBITDA / resultado antes de impuesto", "ebitda",    "cf-ebitda-row")}
+          ${dataRow("Impuesto estimado", m => mv(d.impuesto, m))}
+          ${keyRow("Resultado después de impuesto",        "resultado", "cf-result-row")}
+
+          ${secRow("FINANCIAMIENTO SIMPLE")}
+          ${dataRow("Aporte de capital socios",     m => mv(d.aporteCapital, m))}
+          ${dataRow("Crédito hipotecario bancario", m => mv(d.creditoHipotecario, m))}
+          ${totRow("Total financiamiento", "financ")}
+
+          ${spacerRow()}
+          ${dataRow("Financiamiento recibido", m => C[m].financ, "cf-financ-row")}
+          ${keyRow("Caja neta del mes", "cajaNeta", "cf-cajaneta-row")}
+          ${keyRow("Caja acumulada",   "cajaAcum", "cf-cajaacum-row")}
         </tbody>
       </table>
     </div>
-    ${resultado<0?`<div class="balance-note" style="margin-top:14px">💡 El resultado negativo es normal en construcción — los gastos son activo (Obra en Curso). El resultado positivo se realiza al vender el proyecto.</div>`:""}
   </div>`;
 }
-
 
 function renderAll(){
   const safe = fn => { try{ fn(); }catch(e){ console.error(e); } };
@@ -1992,16 +2039,45 @@ function renderVentas(){
   const el = $("ventas-root");
   if(!el) return;
 
+  // Combinar ingresos manuales + abonos de cartola bancaria
+  const abonosBanco = (typeof movBanco !== "undefined" ? movBanco : [])
+    .filter(m => m.tipo === "abono")
+    .map(m => ({
+      id:                "banco_" + (m.id || Math.random()),
+      fecha:             m.fecha,
+      concepto:          m.descripcion || "Abono bancario",
+      categoria_contable:"Abono banco",
+      monto:             m.monto,
+      estado:            "Recibido",
+      _fromBanco:        true,
+    }));
+
+  // Merge: primero manuales, luego bancarios — sin duplicados por concepto+fecha+monto
+  const allIngresos = [...ventasIngresos];
+  for(const ab of abonosBanco){
+    const dup = allIngresos.some(r =>
+      r.fecha === ab.fecha &&
+      Math.abs(numberValue(r.monto) - numberValue(ab.monto)) < 1
+    );
+    if(!dup) allIngresos.push(ab);
+  }
+  allIngresos.sort((a,b) => fechaOrdenable(b.fecha).localeCompare(fechaOrdenable(a.fecha)));
+
   const badge = estado => {
+    const m = { Recibido:{bg:"var(--green-soft)",c:"var(--green)"}, Pendiente:{bg:"var(--amber-soft)",c:"var(--amber)"}, Anulado:{bg:"var(--red-soft)",c:"var(--red)"} };
+    const s = m[estado]||{bg:"#f8fafc",c:"var(--muted)"};
+    return `<span class="jv-badge" style="background:${s.bg};color:${s.c}">${estado}</span>`;
+  } = estado => {
     const m = { Recibido:{bg:"var(--green-soft)",c:"var(--green)"}, Pendiente:{bg:"var(--amber-soft)",c:"var(--amber)"}, Anulado:{bg:"var(--red-soft)",c:"var(--red)"} };
     const s = m[estado]||{bg:"#f8fafc",c:"var(--muted)"};
     return `<span class="jv-badge" style="background:${s.bg};color:${s.c}">${estado}</span>`;
   };
 
-  const totalRec  = ventasIngresos.filter(r=>r.estado==="Recibido").reduce((a,r)=>a+numberValue(r.monto),0);
-  const aportes   = ventasIngresos.filter(r=>r.categoria_contable==="Aporte");
-  const anticipos = ventasIngresos.filter(r=>r.categoria_contable==="Anticipo");
-  const venta     = ventasIngresos.filter(r=>r.categoria_contable==="Venta propiedad");
+  const totalRec  = allIngresos.filter(r=>r.estado==="Recibido").reduce((a,r)=>a+numberValue(r.monto),0);
+  const aportes   = allIngresos.filter(r=>r.categoria_contable==="Aporte");
+  const anticipos = allIngresos.filter(r=>r.categoria_contable==="Anticipo");
+  const venta     = allIngresos.filter(r=>r.categoria_contable==="Venta propiedad");
+  const abonos    = allIngresos.filter(r=>r.categoria_contable==="Abono banco");
 
   el.innerHTML = `
   <div class="kpi-grid" style="margin-bottom:20px">
@@ -2025,6 +2101,11 @@ function renderVentas(){
       <div class="kpi-value">${venta.length?formatoCLP(venta.reduce((a,r)=>a+numberValue(r.monto),0)):"—"}</div>
       <div class="kpi-footer">${venta.length?"Proyecto vendido":"Pendiente de venta"}</div>
     </div>
+    <div class="kpi-card">
+      <div class="kpi-title">Abonos de cartola</div>
+      <div class="kpi-value">${formatoCLP(abonos.reduce((a,r)=>a+numberValue(r.monto),0))}</div>
+      <div class="kpi-footer">${abonos.length} abono${abonos.length!==1?"s":""} importados del banco</div>
+    </div>
   </div>
   <div class="card">
     <div class="card-header-row">
@@ -2040,8 +2121,8 @@ function renderVentas(){
         <div style="text-align:right">Monto</div><div>Estado</div><div>Acc.</div>
       </div>
       <div>
-        ${ventasIngresos.length
-          ? ventasIngresos.map(r=>`
+        ${allIngresos.length
+          ? allIngresos.map(r=>`
             <div class="table-row jv-ing-row">
               <div>${normalizarFecha(r.fecha)}</div>
               <div class="doc-name">${r.concepto||"—"}</div>
@@ -2049,11 +2130,13 @@ function renderVentas(){
               <div style="text-align:right;font-weight:600">${formatoCLP(r.monto)}</div>
               <div>${badge(r.estado)}</div>
               <div class="doc-actions">
-                <button class="action-btn" onclick="openModalIngreso(${r.id})">✏️</button>
-                <button class="action-btn" onclick="deleteIngreso(${r.id})">🗑️</button>
+                ${r._fromBanco
+                  ? `<span class="jv-badge" style="background:#eff6ff;color:#1d4ed8;font-size:10px">🏦 Banco</span>`
+                  : `<button class="action-btn" onclick="openModalIngreso(${r.id})">✏️</button>
+                     <button class="action-btn" onclick="deleteIngreso(${r.id})">🗑️</button>`}
               </div>
             </div>`).join("")
-          : '<div class="empty-state">Sin ingresos registrados aún.</div>'}
+          : '<div class="empty-state">Sin ingresos ni abonos bancarios registrados.</div>'}
       </div>
     </div>
   </div>`;
