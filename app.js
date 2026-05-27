@@ -1799,24 +1799,9 @@ function setupButtons(){
   $("btn-bulk-cancel")?.addEventListener("click",cancelBulkSelection);
 }
 /* ── VENTAS DATA ─────────────────────────────────────────── */
-let ventasIngresos = [
-  {id:1, fecha:"2024-05-23", concepto:"Aporte mensual — Mayo",          tipo:"Transferencia", monto:5000000,  estado:"Recibido", categoria_contable:"Aporte"},
-  {id:2, fecha:"2024-05-10", concepto:"Anticipo Etapa 1 — Estructura",  tipo:"Cheque",        monto:15000000, estado:"Recibido", categoria_contable:"Anticipo"},
-  {id:3, fecha:"2024-04-28", concepto:"Aporte mensual — Abril",         tipo:"Transferencia", monto:5000000,  estado:"Recibido", categoria_contable:"Aporte"},
-  {id:4, fecha:"2024-04-05", concepto:"Anticipo inicial del proyecto",   tipo:"Transferencia", monto:20000000, estado:"Recibido", categoria_contable:"Anticipo"},
-];
-let ventasCotizaciones = [
-  {id:1, fecha:"2024-05-20", proveedor:"Constructora XYZ",      descripcion:"Estructura metálica techumbre",  neto:8500000, iva:1615000, total:10115000, estado:"Pendiente"},
-  {id:2, fecha:"2024-05-15", proveedor:"Electricistas Ramírez", descripcion:"Instalación eléctrica completa", neto:3200000, iva:608000,  total:3808000,  estado:"Aprobada"},
-  {id:3, fecha:"2024-04-30", proveedor:"Gasfitería Central",    descripcion:"Red agua fría y caliente",       neto:2800000, iva:532000,  total:3332000,  estado:"Aprobada"},
-  {id:4, fecha:"2024-04-22", proveedor:"Pinturas del Sur SA",   descripcion:"Pintura interior y exterior",    neto:1900000, iva:361000,  total:2261000,  estado:"Rechazada"},
-];
-let ventasContactos = [
-  {id:1, nombre:"Christian García B.", rol:"Propietario", telefono:"+56 9 8765 4321", correo:"chgarciablanco@gmail.com", estado:"Activo"},
-  {id:2, nombre:"Arq. Patricia López",  rol:"Arquitecto",  telefono:"+56 9 7654 3210", correo:"plopez@arq.cl",            estado:"Activo"},
-  {id:3, nombre:"Constructora XYZ",     rol:"Contratista", telefono:"+56 2 2345 6789", correo:"contacto@xyz.cl",          estado:"Activo"},
-  {id:4, nombre:"Inspector Municipal",  rol:"Inspector",   telefono:"+56 2 2234 5678", correo:"insp@municipio.cl",        estado:"Activo"},
-];
+let ventasIngresos = [];
+let ventasCotizaciones = [];
+let ventasContactos = [];
 let ventasTab = "ingresos";
 let _editingIngresoId = null;
 let _editingCotId = null;
