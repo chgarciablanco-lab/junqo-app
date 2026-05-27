@@ -2065,27 +2065,17 @@ function renderVentas(){
     <div class="kpi-card">
       <div class="kpi-title">Total recibido</div>
       <div class="kpi-value">${formatoCLP(totalRec)}</div>
-      <div class="kpi-footer">${ventasIngresos.filter(r=>r.estado==="Recibido").length} ingresos confirmados</div>
+      <div class="kpi-footer">${allIngresos.filter(r=>r.estado==="Recibido").length} ingresos confirmados</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Aportes de capital</div>
-      <div class="kpi-value">${formatoCLP(aportes.reduce((a,r)=>a+numberValue(r.monto),0))}</div>
-      <div class="kpi-footer">${aportes.length} aporte${aportes.length!==1?"s":""}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Anticipos</div>
-      <div class="kpi-value">${formatoCLP(anticipos.reduce((a,r)=>a+numberValue(r.monto),0))}</div>
-      <div class="kpi-footer">${anticipos.length} anticipo${anticipos.length!==1?"s":""}</div>
+      <div class="kpi-value">${formatoCLP(abonos.reduce((a,r)=>a+numberValue(r.monto),0))}</div>
+      <div class="kpi-footer">${abonos.length} aporte${abonos.length!==1?"s":""} desde cartola bancaria</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-title">Venta propiedad</div>
       <div class="kpi-value">${venta.length?formatoCLP(venta.reduce((a,r)=>a+numberValue(r.monto),0)):"—"}</div>
       <div class="kpi-footer">${venta.length?"Proyecto vendido":"Pendiente de venta"}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-title">Abonos de cartola</div>
-      <div class="kpi-value">${formatoCLP(abonos.reduce((a,r)=>a+numberValue(r.monto),0))}</div>
-      <div class="kpi-footer">${abonos.length} abono${abonos.length!==1?"s":""} importados del banco</div>
     </div>
   </div>
   <div class="card">
@@ -2107,7 +2097,7 @@ function renderVentas(){
             <div class="table-row jv-ing-row">
               <div>${normalizarFecha(r.fecha)}</div>
               <div class="doc-name">${r.concepto||"—"}</div>
-              <div><span class="cat-badge" style="background:#eff6ff;color:#1d4ed8;font-size:11px">${r.categoria_contable||r.tipo||"—"}</span></div>
+              <div><span class="cat-badge" style="background:#eff6ff;color:#1d4ed8;font-size:11px">${r._fromBanco ? "Aporte de capital" : (r.categoria_contable||r.tipo||"—")}</span></div>
               <div style="text-align:right;font-weight:600">${formatoCLP(r.monto)}</div>
               <div>${badge(r.estado)}</div>
               <div class="doc-actions">
